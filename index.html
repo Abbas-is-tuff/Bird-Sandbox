@@ -3516,6 +3516,7 @@ const touches=new Map(),ignoreIds=new Set();let pinch=null,panDrag=null;
 function gestureDown(e){
   touches.set(e.pointerId,{x:e.clientX,y:e.clientY});
   if(touches.size>=2){
+    pendingSpawn=null;
     for(const id of touches.keys()){drags.delete(id);ignoreIds.add(id)}
     holdTool=null;wallDraw=null;pondDraw=null;if(xform){xform.b.held=false;xform=null}panDrag=null;
     const [a,b]=[...touches.values()],mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
@@ -3526,6 +3527,8 @@ function gestureDown(e){
 }
 function gestureMove(e){
   if(touches.has(e.pointerId))touches.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(pendingSpawn&&pendingSpawn.pid===e.pointerId){pendingSpawn.wx=e.clientX/cam.z+cam.x;pendingSpawn.wy=e.clientY/cam.z+cam.y;
+    if(Math.hypot(e.clientX-pendingSpawn.sx,e.clientY-pendingSpawn.sy)>12){panDrag={id:e.pointerId,sx:pendingSpawn.sx,sy:pendingSpawn.sy,cx:pendingSpawn.cx,cy:pendingSpawn.cy};pendingSpawn=null}else return true}
   if(pinch&&touches.size>=2){const [a,b]=[...touches.values()],mx=(a.x+b.x)/2,my=(a.y+b.y)/2,d=Math.hypot(a.x-b.x,a.y-b.y)||1;
     cam.z=clamp(pinch.z0*d/pinch.d0,.2,3);
     if(camFollow){clampCam();updView();return true}
@@ -3535,6 +3538,7 @@ function gestureMove(e){
 }
 function gestureUp(e){
   touches.delete(e.pointerId);
+  if(pendingSpawn&&pendingSpawn.pid===e.pointerId){doSpawn(pendingSpawn,false);return true}
   if(pinch&&touches.size<2)pinch=null;
   if(panDrag&&panDrag.id===e.pointerId){panDrag=null;return true}
   if(ignoreIds.has(e.pointerId)){ignoreIds.delete(e.pointerId);return true}
@@ -3675,6 +3679,16 @@ const FIRST_EXTINCT=BIRDS.length;
 BIRDS.push({name:'Kauaʻi ʻŌʻō',s:.8,bk:1.6,body:'#1e1c1a',belly:'#4a3a2e',wing:'#141414',wingTip:'#0a0a0a',head:'#121212',face:'#121212',cheek:null,crest:null,beak:'#141414',
   tail:'#141414',tailLen:1.1,legs:'#1a1a1a',thighs:'#ffd23f',iris:'#f2e08a',throatSpots:'#8a8a8a',pitch:1.1,call:'oo',walker:false,nectar:true,extinct:'Extinct since 1987 — the last one sang a love song that no one answered 💛',mass:.6});
 
+
+// ---- placing things vs moving the camera ----
+let pendingSpawn=null;
+function doSpawn(ps,withDrag){
+  pendingSpawn=null;pushUndo();const x=ps.x,y=ps.y,id=ps.id;
+  if(id==='tree'||id==='house'||id==='lamp'||id==='feeder'||id==='sling'||id==='mirror'||id==='sprinkler'){spawn(id,x,y);return}
+  const b=spawn(id,x,Math.min(y,groundY-20));
+  if(withDrag&&b&&b.ps&&!['balloon','bell','swing','campfire','pinata'].includes(b.type))drags.set(ps.pid,{p:b.type==='bird'?b.U:b.type==='animal'?b.C:b.ps[0],x:ps.wx,y:ps.wy});
+}
+function pendingCheck(){if(pendingSpawn&&performance.now()-pendingSpawn.t0>230)doSpawn(pendingSpawn,true)}
 /* =================== UNDO =================== */
 const undoStack=[];
 function pushUndo(){
@@ -3725,13 +3739,12 @@ cv.addEventListener('pointerdown',e=>{
   if(setEl.classList.contains('open'))setEl.classList.remove('open');
   if(inspected&&mode.id!=='inspect'){inspected=null;updateInfo()}
   const x=WX(e),y=WY(e);
-  if(mode.id!=='inspect'&&!(mode.id==='drag'&&!pick(x,y,38)))pushUndo();
+  if(mode.id!=='inspect'&&mode.kind!=='spawn'&&!(mode.id==='drag'&&!pick(x,y,38)))pushUndo();
   if(mode.kind==='spawn'){
-    {const pk=pick(x,y,4);if(pk&&!pk.pinned&&pk.body.type!=='branch'){drags.set(e.pointerId,{p:pk,x,y,t0:performance.now(),sx:x,sy:y});return}}
-    if(mode.id==='pond'){pondDraw={x0:x,x1:x,id:e.pointerId};return}
-    if(mode.id==='tree'||mode.id==='house'||mode.id==='lamp'||mode.id==='feeder'||mode.id==='sling'||mode.id==='mirror'||mode.id==='sprinkler'){spawn(mode.id,x,y);return}
-    const b=spawn(mode.id,x,Math.min(y,groundY-20));
-    if(b&&b.ps&&!['balloon','bell','swing','campfire','pinata'].includes(b.type))drags.set(e.pointerId,{p:b.type==='bird'?b.U:b.ps[0],x,y});
+    {const pk=pick(x,y,4);if(pk&&!pk.pinned&&pk.body.type!=='branch'){pushUndo();drags.set(e.pointerId,{p:pk,x,y,t0:performance.now(),sx:x,sy:y});return}}
+    if(mode.id==='pond'){pushUndo();pondDraw={x0:x,x1:x,id:e.pointerId};return}
+    // wait to see if this is a tap (place it), a hold (place it and drag it) or a swipe/pinch (move the camera)
+    pendingSpawn={pid:e.pointerId,id:mode.id,x,y,wx:x,wy:y,sx:e.clientX,sy:e.clientY,cx:cam.x,cy:cam.y,t0:performance.now()};
     return;
   }
   switch(mode.id){
@@ -4058,7 +4071,7 @@ function frame(t){
     updateWeather(dt,dt/60);updateWeatherExtras(dt);{const n=QUAL[S.quality].sub||1;for(let i=0;i<n;i++)step(dt/n,i>0)}updateFx(dt);
   } else {allP=[];for(const b of bodies)for(const p of b.ps)allP.push(p)}
   updateLight();updateAmbience(sec);
-  updateCamera();render();
+  pendingCheck();updateCamera();render();
   uiT-=sec;if(uiT<0){uiT=.5;updateInfo();$('clock').textContent=(light<.25?'🌙 ':'☀️ ')+clockStr()+'  '+WICON[S.weather]+'  🌡️'+Math.round(temp)+'°C'+(Math.abs(windNow)>1?'  💨'+Math.abs(windNow).toFixed(0):'');if(setEl.classList.contains('open'))$('vTime').textContent=clockStr();if(S.timeFlow)syncUI()}
 }
 requestAnimationFrame(frame);
