@@ -1675,6 +1675,7 @@ function render(){
       case 'flash':ctx.fillStyle='rgba(255,220,120,.55)';circle(ctx,e.x,e.y,e.r*(1.1-a*.7));break;
       case 'tracer':ctx.strokeStyle=e.col;ctx.lineWidth=e.w;ctx.lineCap='round';if(e.laser){ctx.shadowColor=e.col;ctx.shadowBlur=10}ctx.beginPath();ctx.moveTo(e.x+(e.x2-e.x)*(1-a)*.6,e.y+(e.y2-e.y)*(1-a)*.6);ctx.lineTo(e.x2,e.y2);ctx.stroke();ctx.shadowBlur=0;break;
       case 'muzzle':ctx.save();ctx.translate(e.x,e.y);ctx.rotate(e.a);ctx.fillStyle=e.col;ctx.beginPath();ctx.moveTo(0,-5*e.s);ctx.lineTo(16*e.s,0);ctx.lineTo(0,5*e.s);ctx.closePath();ctx.fill();ctx.fillStyle='#fff';circle(ctx,2,0,3*e.s);ctx.restore();break;
+      case 'arrowStuck':ctx.save();ctx.translate(e.x,e.y);ctx.rotate(e.a);ctx.strokeStyle='#8a6a3a';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-18,0);ctx.lineTo(2,0);ctx.stroke();ctx.fillStyle='#f4f4f2';ctx.fillRect(-20,-3,6,6);ctx.restore();break;
       case 'shell':ctx.save();ctx.translate(e.x,e.y);ctx.rotate(e.rot);ctx.fillStyle='#d4a017';ctx.fillRect(-3,-1.3,6,2.6);ctx.restore();break;
       case 'mushroom':{const k=1-a,h=60+k*360,cw=50+k*170;ctx.globalAlpha=Math.min(1,a*1.6);ctx.fillStyle='rgba(120,95,70,.75)';ctx.fillRect(e.x-18-k*20,e.y-h,36+k*40,h);
         const g2=ctx.createRadialGradient(e.x,e.y-h,10,e.x,e.y-h,cw);g2.addColorStop(0,'rgba(255,200,90,.95)');g2.addColorStop(.4,'rgba(200,110,50,.85)');g2.addColorStop(1,'rgba(90,70,55,0)');ctx.fillStyle=g2;ctx.beginPath();ctx.ellipse(e.x,e.y-h,cw,cw*.6,0,0,TAU);ctx.fill();break}
@@ -1731,7 +1732,7 @@ function updateFx(dt){
       case 'leaf':e.vx+=(windNow*.35-e.vx)*.04*dt;e.vy=Math.min(e.vy+.03*dt,1.2);e.x+=(e.vx+Math.sin(e.life*20)*.6)*dt;e.y+=e.vy*dt;e.rot+=e.vr*dt;if(e.y>groundY-2){e.y=groundY-2;e.vx*=.9;e.vr=0}e.life-=.004*dt;break;
       case 'ember':e.x+=(e.vx+windNow*.05)*dt;e.y+=e.vy*dt;e.vy-=.005*dt;e.life-=.012*dt;break;
       case 'flash':e.life-=.08*dt;break;
-      case 'tracer':e.life-=.2*dt;break;case 'muzzle':e.life-=.3*dt;break;
+      case 'tracer':e.life-=.2*dt;break;case 'arrowStuck':e.life-=.003*dt;break;case 'muzzle':e.life-=.3*dt;break;
       case 'shell':e.vy+=.3*dt;e.x+=e.vx*dt;e.y+=e.vy*dt;e.rot+=e.vr*dt;if(e.y>groundY-2){e.y=groundY-2;e.vy*=-.3;e.vx*=.6;e.vr*=.5}e.life-=.01*dt;break;
       case 'mushroom':e.life-=.0035*dt;break;
       case 'heart':case 'zzz':e.y+=e.vy*dt;e.life-=.015*dt;break;
@@ -4146,6 +4147,212 @@ function drawXpl(c,b){
   if(b.lit&&b.fuse!==undefined&&!b.impact){c.fillStyle=b.kind==='nuke'?'#ff2a2a':'#fff';c.font='bold '+(b.kind==='nuke'?16:11)+'px system-ui';c.textAlign='center';c.textBaseline='middle';c.fillText(Math.max(0,Math.ceil(b.fuse/60)),p.x,p.y-r-12)}
 }
 
+/* =================== MORE BIRDS, ANIMALS & WEAPONS (incl. extinct!) =================== */
+Object.assign(CALLX,{
+  dodo:(p,x)=>{if(!okSnd('call',60))return;tone('sine',320,260,.25,.08,null,x);tone('sine',300,240,.25,.07,null,x,.3)},
+  boom:(p,x)=>{if(!okSnd('call',60))return;tone('sine',90,70,.7,.14,null,x);tone('sine',85,65,.6,.1,null,x,.8)},
+  coo:(p,x)=>{if(!okSnd('call',60))return;for(let i=0;i<3;i++)tone('sine',520,440,.22,.05,null,x,i*.28)},
+  screech:(p,x)=>{if(!okSnd('call',60))return;tone('sawtooth',2200,1400,.5,.04,1800,x);noise(.4,.05,3000,'bandpass',x,2)},
+  chirp:(p,x)=>{if(!okSnd('call',60))return;for(let i=0;i<5;i++)tone('sine',4200+Math.random()*800,3600,.05,.03,null,x,i*.08)},
+  gobble:(p,x)=>{if(!okSnd('call',60))return;for(let i=0;i<8;i++)tone('square',700+Math.random()*200,500,.05,.03,600,x,i*.06)},
+  clatter:(p,x)=>{if(!okSnd('call',60))return;for(let i=0;i<10;i++)noise(.03,.12,2200,'bandpass',x,3,i*.05)},
+  squawk2:(p,x)=>{if(!okSnd('call',60))return;tone('sawtooth',1300,900,.25,.05,1100,x);tone('sawtooth',1200,800,.2,.04,1000,x,.3)},
+  honk2:(p,x)=>{if(!okSnd('call',60))return;tone('sawtooth',380,320,.3,.06,500,x)},
+});
+const FIRST_EXTINCT2=BIRDS.length;
+BIRDS.push(
+ {name:'Dodo',s:1.45,hs:1.15,nk:.6,bl:1.35,ll:.75,wl:.45,bk:1.9,body:'#8d8a86',belly:'#a8a49e',wing:'#7a7672',wingTip:'#f2efe6',head:'#a6a29c',face:'#c9c2b6',cheek:null,crest:null,beak:'#c9b46a',beakTip:'#7a6a3a',hook:true,tail:'#f2efe6',tailLen:.35,legs:'#e8c14a',pitch:.55,call:'dodo',walker:true,flightless:true,waddle:true,mass:3,extinct:'Extinct since about 1681 — it lived only on the island of Mauritius 🏝️'},
+ {name:'Moa',s:2.3,hs:.7,nk:2.4,bl:1.4,ll:2.6,wl:.2,body:'#6b4a2e',belly:'#7a5838',wing:'#5a3e26',wingTip:'#4a321e',head:'#6b4a2e',face:'#6b4a2e',cheek:null,crest:null,beak:'#d8c8a0',tail:'#5a3e26',tailLen:.3,legs:'#8a8070',pitch:.3,call:'boom',walker:true,flightless:true,run:1.6,mass:6,hairy:true,extinct:'Extinct for about 600 years — giant birds of New Zealand, taller than a person!'},
+ {name:'Passenger Pigeon',s:1.15,hs:.8,nk:.9,bl:1.2,wl:1.3,body:'#7d8aa0',belly:'#d98a5a',wing:'#8a95a8',wingTip:'#3e4552',head:'#7d8aa0',face:'#7d8aa0',cheek:null,crest:null,collar:'#b07ab8',beak:'#2a2a2a',tail:'#7d8aa0',tailLen:1.5,legs:'#d9534f',iris:'#e05a2a',pitch:.6,call:'coo',walker:true,bob:true,mass:1.3,spd:1.6,extinct:'Extinct since 1914 — there used to be BILLIONS of them. The last one was named Martha'},
+ {name:'Great Auk',s:1.35,hs:.95,nk:.45,bl:1.35,ll:.5,wl:.55,bk:1.6,body:'#1b1d22',belly:'#f4f4f2',wing:'#1b1d22',wingTip:'#111216',head:'#1b1d22',face:'#1b1d22',cheek:'#f4f4f2',crest:null,beak:'#1b1d22',hook:true,tail:'#1b1d22',tailLen:.3,legs:'#1b1d22',pitch:.6,call:'penguin',walker:true,flightless:true,swimmer:true,coldOK:true,waddle:true,mass:2.2,extinct:'Extinct since 1844 — the original "penguin" of the North Atlantic 🐧'},
+ {name:'Carolina Parakeet',s:.95,bk:1.1,body:'#5cb83c',belly:'#7ccc58',wing:'#4aa030',wingTip:'#2e7a20',head:'#ffd23f',face:'#ff7b29',cheek:null,crest:null,beak:'#f2e8d0',hook:true,tail:'#4aa030',tailLen:1.5,legs:'#d9c4a8',pitch:1.2,call:'conure',walker:true,mass:.9,extinct:'Extinct since 1918 — the only parrot that lived in the eastern USA 🦜'},
+ {name:'Elephant Bird',s:2.6,hs:.7,nk:2,bl:1.5,ll:2.2,wl:.2,body:'#5a4630',belly:'#6a553c',wing:'#4a3a28',wingTip:'#3a2e20',head:'#5a4630',face:'#5a4630',cheek:null,crest:null,beak:'#a89878',tail:'#4a3a28',tailLen:.3,legs:'#7a6a5a',pitch:.25,call:'boom',walker:true,flightless:true,run:1.2,mass:9,hairy:true,extinct:'Extinct for about 1000 years — from Madagascar. Its eggs were as big as a football! 🥚'},
+ {name:'Terror Bird',s:2.1,hs:1.25,nk:1.5,bl:1.2,ll:2,wl:.3,bk:2.2,body:'#4a3a2a',belly:'#6a5640',wing:'#3a2c1e',wingTip:'#2a2016',head:'#4a3a2a',face:'#5a4632',cheek:null,crest:'#2a2016',beak:'#e8c06a',hook:true,tail:'#3a2c1e',tailLen:.6,legs:'#a89070',iris:'#ffd23f',pitch:.35,call:'screech',walker:true,flightless:true,run:2.6,mass:5,extinct:'Extinct about 2 million years ago — a giant hunting bird with a HUGE hooked beak 😱'},
+ {name:'Archaeopteryx',s:1,hs:.95,nk:1.1,bl:1.15,bk:1.6,body:'#3a5a6a',belly:'#8aa0a8',wing:'#2a3e4a',wingTip:'#141e24',head:'#4a6a7a',face:'#4a6a7a',cheek:null,crest:null,beak:'#4a4a4a',tail:'#2a3e4a',tailStripe:'#141e24',tailLen:2.2,legs:'#6a6a6a',iris:'#ffb400',pitch:.8,call:'squawk2',walker:true,glider:true,mass:1,extinct:'Lived 150 million years ago — half dinosaur, half bird! It had teeth and claws on its wings 🦖'},
+ {name:"Haast's Eagle",s:2.2,hs:1,nk:1.2,bl:1.25,wl:1.6,ll:1.2,bk:1.5,body:'#3e2a1a',belly:'#5a3e28',wing:'#2e1e12',wingTip:'#1e140a',head:'#4a3420',face:'#4a3420',cheek:null,crest:null,beak:'#f2b705',hook:true,tail:'#2e1e12',tailLen:1,legs:'#f2b705',iris:'#e8c040',pitch:.6,call:'eagle',walker:false,glider:true,mass:5,spd:1.5,extinct:'Extinct for about 600 years — the biggest eagle ever. It hunted moa!'},
+ {name:'Huia',s:1.05,bk:2.2,body:'#141416',belly:'#1a1a1e',wing:'#101012',wingTip:'#08080a',head:'#141416',face:'#141416',cheek:'#ff8a33',crest:null,beak:'#efe6d0',tail:'#141416',tailStripe:'#f4f1ea',tailLen:1.2,legs:'#3a3a3a',pitch:1,call:'kiwi',walker:true,mass:1,extinct:'Extinct since 1907 — boys and girls had different shaped beaks! 🇳🇿'},
+ {name:'Labrador Duck',s:1.1,hs:.95,bk:1.2,body:'#1f1f22',belly:'#2a2a2e',wing:'#f4f4f2',wingTip:'#1f1f22',head:'#f4f4f2',face:'#f4f4f2',cheek:null,crest:null,collar:'#1f1f22',beak:'#3a3a40',tail:'#1f1f22',tailLen:.6,legs:'#6a6a70',pitch:.7,call:'quack',walker:true,swimmer:true,waddle:true,mass:1.6,extinct:'Extinct since 1878 — a black and white sea duck 🦆'},
+ {name:'Pink-headed Duck',s:1.05,hs:.95,bk:1.2,body:'#4a3020',belly:'#5a3a26',wing:'#3a2418',wingTip:'#c9a0b0',head:'#ff8fb1',face:'#ff8fb1',cheek:null,crest:null,beak:'#ff6a95',tail:'#3a2418',tailLen:.6,legs:'#3a3a3a',pitch:.75,call:'quack',walker:true,swimmer:true,waddle:true,mass:1.5,extinct:'Probably extinct since 1949 — a duck with a bright pink head from India 💗'},
+ {name:'Paradise Parrot',s:.85,bk:1.1,body:'#3fbfa0',belly:'#ff4d4d',wing:'#5a7a8a',wingTip:'#2a3a4a',head:'#1a1a1a',face:'#ff4d4d',cheek:null,crest:null,beak:'#d8d0c0',hook:true,tail:'#3fbfa0',tailStripe:'#1f6fd0',tailLen:1.9,legs:'#7a7a7a',pitch:1.3,call:'conure',walker:true,mass:.6,extinct:'Extinct since 1928 — a rainbow parrot from Australia 🌈'},
+);
+const FIRST_MORE=BIRDS.length;
+BIRDS.push(
+ {name:'Vulture',s:1.7,hs:.9,nk:1.4,bl:1.2,wl:1.6,ll:1.1,bk:1.3,body:'#3a3028',belly:'#4a3e34',wing:'#2a221c',wingTip:'#1a1612',head:'#e8b0a0',face:'#e8b0a0',cheek:null,crest:null,collar:'#f2efe6',beak:'#d8c8a8',hook:true,tail:'#2a221c',tailLen:.8,legs:'#c9b8a0',pitch:.4,call:'raven',walker:true,glider:true,mass:3,spd:1.2},
+ {name:'Stork',s:1.5,hs:.85,nk:1.9,ll:2.2,bk:2.1,body:'#f6f6f2',belly:'#ffffff',wing:'#f6f6f2',wingTip:'#1a1a1a',head:'#f6f6f2',face:'#f6f6f2',cheek:null,crest:null,beak:'#e8423a',tail:'#f6f6f2',tailLen:.6,legs:'#e8423a',pitch:.6,call:'clatter',walker:true,glider:true,fisher:true,mass:2.2},
+ {name:'Albatross',s:1.6,hs:.95,nk:1.1,wl:2,bk:1.6,body:'#f8f8f6',belly:'#ffffff',wing:'#3a3a3e',wingTip:'#1a1a1e',head:'#f8f8f6',face:'#f8f8f6',cheek:null,crest:null,stripe:'#9aa0a8',beak:'#f2c8a0',hook:true,tail:'#3a3a3e',tailLen:.6,legs:'#f2c8c0',pitch:.6,call:'gull',walker:true,swimmer:true,glider:true,fisher:true,waddle:true,mass:2.6,spd:1.4},
+ {name:'Emu',s:1.8,hs:.75,nk:2.1,bl:1.3,ll:2.3,wl:.3,body:'#6a5a4a',belly:'#7a6a58',wing:'#5a4a3a',wingTip:'#4a3a2e',head:'#3a4a6a',face:'#5a6a8a',cheek:null,crest:null,beak:'#2a2a2a',tail:'#5a4a3a',tailLen:.3,legs:'#7a7068',iris:'#c9a020',pitch:.25,call:'boom',walker:true,flightless:true,run:2.4,hairy:true,mass:3.6},
+ {name:'Cassowary',s:1.8,hs:.8,nk:1.7,bl:1.3,ll:2.1,wl:.3,body:'#141414',belly:'#1a1a1a',wing:'#101010',wingTip:'#0a0a0a',head:'#2f8fe0',face:'#2f8fe0',cheek:null,crest:null,crestPoint:'#a8784a',collar:'#e01e37',beak:'#2a2a2a',tail:'#101010',tailLen:.3,legs:'#8a8a6a',iris:'#c9a020',pitch:.25,call:'boom',walker:true,flightless:true,run:2.2,hairy:true,mass:4},
+ {name:'Roadrunner',s:1,hs:.95,nk:1,bl:1.2,ll:1.4,bk:1.5,body:'#8a7058',belly:'#e8dcc8',wing:'#6a5440',wingTip:'#3a2e22',head:'#6a5440',face:'#6a5440',cheek:'#3fa0e0',crest:'#4a3a2a',beak:'#2a2a2a',tail:'#5a4636',tailLen:1.9,legs:'#7a7a8a',pitch:1,call:'coo',walker:true,run:3.2,mass:.9,spd:1.1},
+ {name:'Magpie',s:1.05,bk:1.2,body:'#141418',belly:'#f6f6f4',wing:'#1a3a6a',wingTip:'#0a0a0a',head:'#141418',face:'#141418',cheek:null,crest:null,beak:'#141418',tail:'#14304a',tailLen:2,legs:'#141418',pitch:.9,call:'clatter',walker:true,mass:1},
+ {name:'Sparrow',s:.65,bk:.95,body:'#a8805a',belly:'#d8cbb8',wing:'#8a6440',wingTip:'#4a3420',head:'#7a7a7a',face:'#d8cbb8',cheek:null,crest:null,collar:'#1a1a1a',beak:'#3a3a3a',finch:true,tail:'#6a4a30',tailLen:1,legs:'#c9a080',pitch:1.8,call:'chirp',walker:true,mass:.4},
+ {name:'Swallow',s:.7,bk:.8,wl:1.6,body:'#1f3a7a',belly:'#f2e2d0',wing:'#14285a',wingTip:'#0a1430',head:'#1f3a7a',face:'#c9402a',cheek:null,crest:null,beak:'#1a1a1a',tail:'#14285a',tailLen:1.8,legs:'#3a3a3a',pitch:1.9,call:'chirp',walker:false,mass:.35,spd:1.7},
+ {name:'Shoebill',s:1.7,hs:1.3,nk:1.2,ll:1.9,bk:2.1,body:'#8a96a2',belly:'#a0aab4',wing:'#76828e',wingTip:'#4a525a',head:'#8a96a2',face:'#8a96a2',cheek:null,crest:'#8a96a2',beak:'#c9b890',hook:true,tail:'#76828e',tailLen:.5,legs:'#3a3a3a',iris:'#e8e0b8',eyeR:2.6,pitch:.4,call:'clatter',walker:true,fisher:true,glider:true,mass:3},
+ {name:'Secretary Bird',s:1.6,hs:.9,nk:1.1,ll:2.6,bk:1.3,body:'#d8dce0',belly:'#e8ecf0',wing:'#1a1a1e',wingTip:'#0a0a0e',head:'#d8dce0',face:'#ff8a2a',cheek:null,crest:'#1a1a1e',beak:'#b8b8b8',hook:true,tail:'#d8dce0',tailStripe:'#1a1a1e',tailLen:1.6,legs:'#f2d0b0',pitch:.5,call:'boom',walker:true,glider:true,run:2,mass:2.4},
+ {name:'Snowy Owl',s:1.3,hs:1.35,nk:.4,bl:.95,wl:1.25,ll:.7,body:'#ffffff',belly:'#ffffff',wing:'#f2f2ee',wingTip:'#3a3a3a',head:'#ffffff',face:'#ffffff',cheek:null,crest:null,beak:'#2a2a2a',hook:true,tail:'#f2f2ee',tailLen:.5,legs:'#ffffff',call:'owl',pitch:.5,walker:false,owl:true,eyeR:4.2,iris:'#ffd23f',coldOK:true,quiet:true,mass:1.8,spots:true},
+ {name:'Barn Owl',s:1.15,hs:1.3,nk:.45,bl:.95,wl:1.3,ll:.85,body:'#d9a860',belly:'#fbf6ec',wing:'#c99a52',wingTip:'#8a6a3a',head:'#d9a860',face:'#fdf9f2',cheek:null,crest:null,beak:'#e8d8c0',hook:true,tail:'#c99a52',tailLen:.5,legs:'#f2e8d8',call:'screech',pitch:.6,walker:false,owl:true,eyeR:3,nocturnal:true,quiet:true,mass:1.3,spots:true},
+ {name:'Falcon',s:1.1,bk:1.1,wl:1.5,body:'#4a5a6e',belly:'#f0e8dc',wing:'#3a4a5e',wingTip:'#1e2632',head:'#2a3240',face:'#f0e8dc',cheek:null,crest:null,beak:'#3a3a3a',hook:true,cere:'#ffd23f',tail:'#3a4a5e',tailStripe:'#1e2632',tailLen:1.1,legs:'#ffd23f',iris:'#2a2a2a',pitch:1,call:'hawk',walker:false,glider:true,mass:1.2,spd:2},
+ {name:'Condor',s:2,hs:.9,nk:1.3,bl:1.2,wl:1.8,ll:1.1,bk:1.3,body:'#141414',belly:'#1a1a1a',wing:'#141414',wingTip:'#f2f2f2',head:'#c94a3a',face:'#c94a3a',cheek:null,crest:null,collar:'#f6f6f4',beak:'#d8c8a8',hook:true,tail:'#141414',tailLen:.8,legs:'#8a8a8a',pitch:.35,call:'raven',walker:true,glider:true,mass:4,spd:1.2},
+ {name:'Mandarin Duck',s:1,hs:1,bk:1.1,body:'#8a4a2a',belly:'#f4f4f2',wing:'#ff8a2a',wingTip:'#1f3a7a',head:'#2e7a5a',face:'#f6f2e8',cheek:'#ff8a2a',crest:'#c9402a',beak:'#e8423a',tail:'#3a2a1a',tailLen:.6,legs:'#ff8c1a',pitch:.9,call:'quack',walker:true,swimmer:true,waddle:true,mass:1.2},
+ {name:'Scarlet Ibis',s:1.2,hs:.85,nk:1.6,ll:1.9,bk:2.3,body:'#ff3b1f',belly:'#ff5a3a',wing:'#ff3b1f',wingTip:'#1a1a1a',head:'#ff3b1f',face:'#ff3b1f',cheek:null,crest:null,beak:'#c94a3a',tail:'#ff3b1f',tailLen:.6,legs:'#ff5a3a',pitch:.7,call:'heron',walker:true,fisher:true,mass:1.4},
+ {name:'Spoonbill',s:1.3,hs:.85,nk:1.7,ll:2,bk:2.2,body:'#ffb0c4',belly:'#ffc4d2',wing:'#ff8fab',wingTip:'#e0607f',head:'#f6f2f0',face:'#f6f2f0',cheek:null,crest:null,beak:'#a8a090',beakTip:'#8a7a5a',tail:'#ff8fab',tailLen:.6,legs:'#e0607f',pitch:.6,call:'heron',walker:true,fisher:true,mass:1.6},
+ {name:'Rainbow Lorikeet',s:.85,bk:1,body:'#2fbf4f',belly:'#2f5fd0',wing:'#2fbf4f',wingTip:'#1f8f3a',head:'#3a4ad8',face:'#3a4ad8',cheek:null,crest:null,collar:'#ffd23f',beak:'#ff3b1f',hook:true,tail:'#2fbf4f',tailLen:1.5,legs:'#7a7a7a',iris:'#ff6a1f',pitch:1.4,call:'conure',walker:true,mass:.7},
+ {name:'Kakapo',s:1.4,hs:1.1,nk:.6,bl:1.3,ll:.8,wl:.6,bk:1.2,body:'#8aa83a',belly:'#c9c860',wing:'#6a8a2a',wingTip:'#3a4a1a',head:'#a8b860',face:'#c9c890',cheek:null,crest:null,beak:'#d8d0b8',hook:true,tail:'#6a8a2a',tailLen:.8,legs:'#a8a090',pitch:.4,call:'boom',walker:true,flightless:true,waddle:true,nocturnal:true,mass:2.4,spots:true},
+ {name:'Kea',s:1.2,bk:1.5,body:'#6a8a3a',belly:'#7a9a48',wing:'#5a7a2e',wingTip:'#ff6a1f',head:'#6a8a3a',face:'#6a8a3a',cheek:null,crest:null,beak:'#3a3a3a',hook:true,tail:'#5a7a2e',tailLen:1.1,legs:'#7a7a7a',pitch:.9,call:'squawk2',walker:true,coldOK:true,mass:1.2},
+ {name:'Turkey',s:1.6,hs:.85,nk:1.2,bl:1.3,body:'#3a2a20',belly:'#4a3628',wing:'#5a3e2a',wingTip:'#f2efe6',head:'#7ab0e0',face:'#7ab0e0',cheek:null,crest:null,comb:'#e01e1e',beak:'#c9b8a0',tail:'#5a3e2a',tailStripe:'#f2efe6',tailLen:1.4,tailUp:true,legs:'#e8a0a0',pitch:.6,call:'gobble',walker:true,weakFly:true,bob:true,mass:3.6},
+ {name:'Bird of Paradise',s:1,bk:1.1,body:'#5a2a1a',belly:'#6a3420',wing:'#4a2214',wingTip:'#2a120a',head:'#ffd23f',face:'#2e8b57',cheek:null,crest:null,collar:'#2e8b57',beak:'#b0c0c8',tail:'#ffb020',tailLen:2.4,legs:'#6a6a6a',pitch:1.2,call:'squawk2',walker:true,mass:.9},
+ {name:'Goldfinch',s:.6,bk:.9,body:'#ffd23f',belly:'#fff0a0',wing:'#1a1a1a',wingTip:'#f4f4f2',head:'#ffd23f',face:'#ffd23f',cheek:null,crest:null,collar:null,beak:'#f2c8a0',finch:true,tail:'#1a1a1a',tailLen:1,legs:'#c9a080',pitch:2,call:'chirp',walker:true,mass:.3},
+ {name:'Blue Tit',s:.6,bk:.8,body:'#c8d838',belly:'#ffe03a',wing:'#3a7ad8',wingTip:'#1f4fa0',head:'#3a7ad8',face:'#ffffff',cheek:null,crest:null,collar:'#1a2a5a',beak:'#2a2a2a',tail:'#3a7ad8',tailLen:1,legs:'#7a8aa0',pitch:2.1,call:'chirp',walker:true,mass:.3},
+ {name:'Grey Cockatiel',s:1,body:'#8a8e94',belly:'#9a9ea4',wing:'#7a7e84',wingTip:'#f4f4f2',head:'#c9cdd2',face:'#ffe14d',cheek:'#ff8a33',crest:'#8a8e94',beak:'#8a8a8a',tail:'#5a5e64',tailLen:1.3,legs:'#9a9a9a',pitch:1,call:'tiel',walker:true},
+);
+// ---- animals ----
+Object.assign(ANIMALS,{
+  zebra:{...ANIMALS.horse,n:'Zebra',ic:'🦓',s:1.55,body:'#f6f6f4',belly:'#ffffff',dark:'#d8d8d8',legCol:'#f6f6f4',stripes:'#141414',mane:'#141414',tail:'#f6f6f4',snoutCol:'#2a2a2a',ear:'#f6f6f4'},
+  rhino:{n:'Rhino',ic:'🦏',s:2,bl:15,ll:12,hr:10.5,br:15,body:'#8c8a86',belly:'#9c9a96',dark:'#6c6a66',ear:'#7c7a76',eye:'#111111',nose:'#6c6a66',pads:'#4a4846',pointy:true,snout:1,snoutCol:'#8c8a86',noseHorn:'#d8d0c0',tailW:2,tail:'#8c8a86',growl:true,spd:1.4,jump:2,mass:12,dens:.5,voice:.4,eats:['apple','berry','pumpkin','melon']},
+  hippo:{n:'Hippo',ic:'🦛',s:2,bl:15,ll:9,hr:11,br:16,body:'#8a7a8c',belly:'#d8a8b0',dark:'#6a5a6c',ear:'#6a5a6c',eye:'#111111',nose:'#6a5a6c',pads:'#4a3e4a',roundEar:true,snout:1,snoutCol:'#d8a8b0',tailW:2,tail:'#8a7a8c',swim:true,growl:true,spd:1,jump:2,mass:12,dens:.5,voice:.35,eats:['apple','berry','pumpkin','melon']},
+  gorilla:{...ANIMALS.monkey,n:'Gorilla',ic:'🦍',s:1.8,body:'#2a2a2e',belly:'#3a3a40',dark:'#1a1a1e',ear:'#3a3a40',facePatch:'#4a4a52',tailW:0,tail:'#2a2a2e',growl:true,chatter:false,mass:5,voice:.5,spd:1.3},
+  sloth:{n:'Sloth',ic:'🦥',s:1,bl:11,ll:12,hr:9,br:11,body:'#9a8670',belly:'#b8a690',dark:'#7a6650',ear:'#9a8670',eye:'#111111',nose:'#3a2a1a',pads:'#3a2a1a',roundEar:true,eyePatch:'#4a3a2a',facePatch:'#e8dcc8',tailW:0,spd:.25,jump:1,mass:1.2,dens:.6,voice:1.1,eats:['apple','berry']},
+  otter:{n:'Otter',ic:'🦦',s:.85,bl:12,ll:6,hr:8,br:9,body:'#7a5a3a',belly:'#c9a882',dark:'#5a3e26',ear:'#5a3e26',eye:'#111111',nose:'#1a1a1a',pads:'#3a2a1a',roundEar:true,snout:1,snoutCol:'#c9a882',tailW:6,tail:'#7a5a3a',swim:true,squeaky:true,spd:1.6,jump:5,mass:.9,dens:.45,voice:1.7,eats:['flopfish','chunk']},
+  skunk:{n:'Skunk',ic:'🦨',s:.85,bl:10,ll:7,hr:8,br:10,body:'#1a1a1e',belly:'#2a2a2e',dark:'#0a0a0e',ear:'#1a1a1e',eye:'#111111',nose:'#1a1a1a',pads:'#1a1a1a',pointy:true,snout:1,snoutCol:'#1a1a1e',maneStrip:true,mane:'#f4f4f2',tailW:10,tailUp:20,tail:'#1a1a1e',tailTip:'#f4f4f2',spd:1.2,jump:4,mass:.8,dens:.6,voice:1.5,eats:['berry','seed','chunk','apple']},
+  leopard:{...ANIMALS.lion,n:'Leopard',ic:'🐆',s:1.4,mane:null,body:'#e8b860',belly:'#f6e2b8',spots:'#3a2a1a',tailTip:'#3a2a1a',spd:2.3,jump:9,mass:3.5},
+  cheetah:{...ANIMALS.lion,n:'Cheetah',ic:'🐆',s:1.35,mane:null,ll:18,body:'#e8c070',belly:'#fbf0d8',spots:'#1a1a1a',tailTip:'#1a1a1a',spd:3.6,jump:8,mass:3},
+  hyena:{...ANIMALS.wolf,n:'Hyena',ic:'🐕',s:1.3,body:'#b89a6a',belly:'#d8c4a0',dark:'#6a5a3a',spots:'#4a3a24',mane:'#4a3a24',maneStrip:true,roundEar:true,pointy:false,howl:false,chatter:true,voice:1.4},
+  moose:{...ANIMALS.deer,n:'Moose',ic:'🫎',s:2,body:'#4a3424',belly:'#5a4030',dark:'#2e2016',ear:'#4a3424',antlers:'#c9b088',legCol:'#8a7a68',tail:'#4a3424',snoutCol:'#4a3424',prey:false,growl:true,spd:1.6,mass:8},
+  reindeer:{...ANIMALS.deer,n:'Reindeer',ic:'🦌',s:1.45,body:'#8a7058',belly:'#f2ece0',dark:'#5a4636',antlers:'#d8c8a8',snoutCol:'#f2ece0',nose:'#e01e1e',coldOK:true},
+  llama:{...ANIMALS.camel,n:'Llama',ic:'🦙',s:1.5,hump:null,wool:true,body:'#f2ead8',belly:'#ffffff',dark:'#c9bea8',ear:'#e2d8c4',pointy:true,roundEar:false,snoutCol:'#e2d8c4',tail:'#f2ead8',voice:.9},
+  koala:{n:'Koala',ic:'🐨',s:.9,bl:10,ll:9,hr:10,br:11,body:'#9a9ea4',belly:'#e8eaec',dark:'#7a7e84',ear:'#c9cdd2',earCol:'#7a7e84',eye:'#111111',nose:'#2a2a2e',pads:'#3a3a3e',roundEar:true,bigEar:true,fluffy:true,tailW:0,spd:.6,jump:4,mass:1.1,dens:.6,voice:.7,growl:true,eats:['apple','berry']},
+  redpanda:{n:'Red Panda',ic:'🦊',s:.95,bl:11,ll:9,hr:9,br:10,body:'#c9542a',belly:'#2a1a14',dark:'#8a3418',legCol:'#2a1a14',ear:'#f4f4f2',eye:'#111111',nose:'#1a1a1a',pads:'#1a1a1a',roundEar:true,mask:'#f4f4f2',snout:1,snoutCol:'#f4f4f2',tailW:8,tail:'#c9542a',ringTail:'#8a3418',fluffy:true,squeaky:true,spd:1.3,jump:6,mass:1,dens:.6,voice:1.6,eats:['berry','apple','seed']},
+  capybara:{n:'Capybara',ic:'🐹',s:1.4,bl:13,ll:9,hr:9.5,br:12,body:'#a0784a',belly:'#b08858',dark:'#7a5a34',ear:'#7a5a34',eye:'#111111',nose:'#3a2a1a',pads:'#3a2a1a',roundEar:true,snout:1,snoutCol:'#8a6a40',tailW:0,swim:true,gentle:true,spd:1,jump:3,mass:3,dens:.5,voice:1.2,eats:['apple','berry','seed','melon','pumpkin']},
+  // ---- extinct! ----
+  mammoth:{...ANIMALS.elephant,n:'Woolly Mammoth',ic:'🦣',s:2.6,body:'#6b4a2e',belly:'#7a583a',dark:'#4a3220',ear:'#5a3e26',tusk:'#f4ecd8',bigTusk:true,fluffy:true,tail:'#6b4a2e',coldOK:true,mass:16,extinct:'Extinct about 4,000 years ago — a furry elephant from the Ice Age ❄️'},
+  sabertooth:{...ANIMALS.lion,n:'Sabertooth Cat',ic:'🐅',s:1.75,mane:null,body:'#c9a060',belly:'#e8d0a0',dark:'#8a6a34',spots:null,tailW:3,saber:'#f6f0e0',mass:6,extinct:'Extinct about 10,000 years ago — had HUGE fangs as long as a banana 🍌'},
+  direwolf:{...ANIMALS.wolf,n:'Dire Wolf',ic:'🐺',s:1.6,body:'#5a5650',belly:'#a8a49c',dark:'#3a3630',mass:3.5,extinct:'Extinct about 13,000 years ago — a bigger, stronger wolf'},
+  thylacine:{...ANIMALS.wolf,n:'Tasmanian Tiger',ic:'🐕',s:1.15,body:'#c8a070',belly:'#e2c8a0',dark:'#8a6a40',stripes:'#3a2a1a',howl:false,chatter:true,tailW:6,extinct:'Extinct since 1936 — it had stripes like a tiger and a pouch like a kangaroo!'},
+  woollyrhino:{n:'Woolly Rhino',ic:'🦏',s:2.1,bl:15,ll:11,hr:10.5,br:15,body:'#7a5a3a',belly:'#8a6a48',dark:'#5a3e26',ear:'#5a3e26',eye:'#111111',nose:'#4a3420',pads:'#3a2a1a',pointy:true,snout:1,snoutCol:'#7a5a3a',noseHorn:'#d8ccb0',bigHorn:true,fluffy:true,tailW:2,tail:'#7a5a3a',growl:true,coldOK:true,spd:1.3,jump:2,mass:12,dens:.5,voice:.35,eats:['apple','berry','pumpkin'],extinct:'Extinct about 14,000 years ago — a fluffy Ice Age rhino with a giant horn'},
+  groundsloth:{n:'Giant Ground Sloth',ic:'🦥',s:2.4,bl:13,ll:12,hr:10,br:13,body:'#7a6448',belly:'#8a7458',dark:'#5a4630',ear:'#7a6448',eye:'#111111',nose:'#3a2a1a',pads:'#2a1e12',roundEar:true,snout:1,snoutCol:'#6a5438',fluffy:true,tailW:7,tail:'#7a6448',growl:true,spd:.6,jump:1,mass:14,dens:.5,voice:.35,eats:['apple','berry','pumpkin','melon'],extinct:'Extinct about 10,000 years ago — a sloth as big as an elephant!'},
+  irishelk:{...ANIMALS.deer,n:'Irish Elk',ic:'🦌',s:2.1,body:'#8a6438',belly:'#c9a878',antlers:'#d8c098',hugeAntlers:true,prey:false,mass:8,extinct:'Extinct about 7,700 years ago — its antlers were 3.6 metres wide!'},
+  cavebear:{...ANIMALS.bear,n:'Cave Bear',ic:'🐻',s:2.1,body:'#4a3020',belly:'#5a3c28',dark:'#2e1c10',snoutCol:'#6a4a30',mass:7,extinct:'Extinct about 24,000 years ago — a giant Ice Age bear that lived in caves'},
+  glyptodon:{...ANIMALS.turtle,n:'Glyptodon',ic:'🐢',s:2.2,body:'#8a7a5a',belly:'#a8987a',dark:'#5a4a30',shell:'#7a6440',eye:'#111111',swim:false,mass:12,extinct:'Extinct about 10,000 years ago — an armadillo the size of a car! 🚗'},
+  trex:{...ANIMALS.croc,n:'T. rex',ic:'🦖',s:2.6,bl:15,ll:17,hr:9.5,br:11,body:'#5a7a3a',belly:'#a8b878',dark:'#3a5a24',scales:'#3a5a24',tailW:9,tailUp:6,swim:false,roar:true,growl:false,hunter:true,dino:true,spd:1.7,jump:5,mass:14,voice:.3,extinct:'Extinct 66 million years ago — the king of the dinosaurs 👑'},
+  raptor:{...ANIMALS.croc,n:'Velociraptor',ic:'🦖',s:1.2,bl:12,ll:15,hr:7.5,br:8,body:'#a8744a',belly:'#e8c898',dark:'#6a4428',scales:'#6a4428',stripes:'#5a3a20',tailW:6,tailUp:4,swim:false,hunter:true,dino:true,screech:true,spd:3,jump:9,mass:1.4,voice:1.2,extinct:'Extinct 70 million years ago — a fast, clever dinosaur with feathers!'},
+  triceratops:{n:'Triceratops',ic:'🦕',s:2.4,bl:15,ll:12,hr:11,br:15,body:'#6a8a9a',belly:'#a8b8c0',dark:'#4a6a7a',ear:'#4a6a7a',eye:'#111111',nose:'#4a6a7a',pads:'#3a4a54',pointy:true,snout:1,snoutCol:'#6a8a9a',frill:'#c9603a',noseHorn:'#f2ead8',browHorns:'#f2ead8',tailW:6,tail:'#6a8a9a',growl:true,dino:true,spd:1.2,jump:2,mass:14,dens:.5,voice:.35,eats:['apple','berry','pumpkin','melon','seed'],extinct:'Extinct 66 million years ago — three horns and a giant frill 🦕'},
+  stegosaurus:{n:'Stegosaurus',ic:'🦕',s:2.4,bl:16,ll:11,hr:7,br:14,body:'#7a9a4a',belly:'#c9d08a',dark:'#5a7a30',ear:'#5a7a30',eye:'#111111',nose:'#5a7a30',pads:'#3a4a20',pointy:true,snout:1,snoutCol:'#7a9a4a',plates:'#e0703a',tailSpikes:'#f2ead8',tailW:7,tail:'#7a9a4a',growl:true,dino:true,spd:.9,jump:1,mass:13,dens:.5,voice:.35,eats:['apple','berry','pumpkin','melon','seed'],extinct:'Extinct 150 million years ago — big plates on its back and a spiky tail'},
+});
+const MORE_LIVING=['zebra','rhino','hippo','gorilla','sloth','otter','skunk','leopard','cheetah','hyena','moose','reindeer','llama','koala','redpanda','capybara'];
+const MORE_EXTINCT=['mammoth','sabertooth','direwolf','thylacine','woollyrhino','groundsloth','irishelk','cavebear','glyptodon','trex','raptor','triceratops','stegosaurus'];
+{const at=ANIMAL_TAB.findIndex(t=>t.id==='fish');
+ ANIMAL_TAB.splice(at,0,...MORE_LIVING.map(k=>({id:'animal:'+k,ic:ANIMALS[k].ic,n:ANIMALS[k].n,h:'<b>'+ANIMALS[k].n+'</b>'})),
+   {sep:'Extinct 🦴 →'},...MORE_EXTINCT.map(k=>({id:'animal:'+k,ic:ANIMALS[k].ic,n:ANIMALS[k].n,h:'<b>'+ANIMALS[k].n+'</b> 🦴 — '+ANIMALS[k].extinct})))}
+// extra drawing for horns, plates, fangs, frills
+function animalExtras(c,b){
+  const d=animalLook(b),dd=b.def,{C,Hp,Hd,s}=b,f=b.f||1,hr=(dd.hr||9)*s;if(!b.att)return;
+  const R=C.r/.85;
+  // up direction of body (perpendicular to spine, pointing away from the legs)
+  let sx=C.x-Hp.x,sy=C.y-Hp.y;const sl=Math.hypot(sx,sy)||1;sx/=sl;sy/=sl;let ux=-sy,uy=sx;if(uy>0){ux=-ux;uy=-uy}
+  if(dd.plates){c.fillStyle=dd.plates;c.strokeStyle='rgba(0,0,0,.25)';c.lineWidth=1;
+    for(let i=0;i<6;i++){const t=-.15+i*.26,bx=Hp.x+(C.x-Hp.x)*t+ux*R*.75,by=Hp.y+(C.y-Hp.y)*t+uy*R*.75,h=R*(.75+.45*Math.sin(i/5*Math.PI));
+      c.beginPath();c.moveTo(bx-sx*R*.28,by-sy*R*.28);c.lineTo(bx+ux*h,by+uy*h);c.lineTo(bx+sx*R*.28,by+sy*R*.28);c.closePath();c.fill();c.stroke()}}
+  if(dd.tailSpikes&&b.att.tail&&b.T3){c.strokeStyle=dd.tailSpikes;c.lineWidth=2.4*s;c.lineCap='round';c.beginPath();for(const o of [-1,1]){c.moveTo(b.T3.x,b.T3.y);c.lineTo(b.T3.x+o*6*s,b.T3.y-9*s)}c.stroke()}
+  if(!b.att.head&&b.att.head!==undefined)return;
+  let hx=Hd.x-C.x,hy=Hd.y-C.y;const hl=Math.hypot(hx,hy)||1;hx/=hl;hy/=hl;
+  if(dd.frill){c.fillStyle=dd.frill;c.beginPath();c.arc(Hd.x-hx*hr*.5,Hd.y-hy*hr*.5-hr*.2,hr*1.25,0,TAU);c.fill();c.fillStyle=d.body;circle(c,Hd.x,Hd.y,hr*.95)}
+  if(dd.noseHorn){const bx=Hd.x+hx*hr*.9,by=Hd.y+hy*hr*.9-hr*.25,L=(dd.bigHorn?1.5:1)*hr;c.fillStyle=dd.noseHorn;c.beginPath();c.moveTo(bx-hx*hr*.3,by);c.lineTo(bx+hx*L*.35,by-L);c.lineTo(bx+hx*hr*.3,by+hr*.1);c.closePath();c.fill()}
+  if(dd.browHorns){c.strokeStyle=dd.browHorns;c.lineWidth=2.8*s;c.lineCap='round';c.beginPath();for(const o of [0,.25]){const bx=Hd.x+hx*hr*(.1+o),by=Hd.y-hr*.55;c.moveTo(bx,by);c.quadraticCurveTo(bx+hx*hr*.6,by-hr*.9,bx+hx*hr*1.5,by-hr*1.1)}c.stroke()}
+  if(dd.saber&&b.alive!==undefined){c.strokeStyle=dd.saber;c.lineWidth=2.2*s;c.lineCap='round';const bx=Hd.x+hx*hr*.75,by=Hd.y+hy*hr*.75+hr*.3;c.beginPath();c.moveTo(bx,by);c.quadraticCurveTo(bx+hx*2*s,by+hr*.6,bx-hx*1*s,by+hr*1.05);c.stroke()}
+  if(dd.bigTusk){c.strokeStyle=dd.tusk;c.lineWidth=hr*.2;c.lineCap='round';const bx=Hd.x+hx*hr*.5,by=Hd.y+hr*.5;c.beginPath();c.moveTo(bx,by);c.bezierCurveTo(bx+hx*hr*1.4,by+hr*1.3,bx+hx*hr*2.3,by+hr*.2,bx+hx*hr*1.6,by-hr*.5);c.stroke()}
+  if(dd.hugeAntlers){c.strokeStyle=dd.antlers;c.lineWidth=2.6*s;c.lineCap='round';c.beginPath();const bx=Hd.x-hx*hr*.2,by=Hd.y-hr*.8;for(const o of [-1,1]){c.moveTo(bx,by);c.quadraticCurveTo(bx+o*hr*1.2,by-hr*.6,bx+o*hr*2.2,by-hr*.9);for(let i=0;i<4;i++){const t=.4+i*.2,px=bx+o*hr*2.2*t,py=by-hr*.9*t;c.moveTo(px,py);c.lineTo(px+o*hr*.2,py-hr*.7)}}c.stroke()}
+}
+{const _da=drawAnimal;drawAnimal=function(c,b){_da(c,b);try{animalExtras(c,b)}catch(e){}}}
+// extinct info shows when you inspect an animal
+// ---- more guns ----
+Object.assign(GUNS,{
+  deagle:{n:'Desert Eagle',ic:'🦅',len:3,dmg:40,rate:24,kick:10,range:1000,col:'#c9b88a',snd:'bang'},
+  ak:{n:'Assault rifle',ic:'🔫',len:6,dmg:14,rate:6,auto:1,kick:4,range:1200,col:'#2a2a2a',stock:'#8a5a2a',mag:1,curveMag:1,snd:'bang'},
+  lmg:{n:'Machine gun',ic:'🎖️',len:7,dmg:11,rate:4,auto:1,kick:4,range:1300,col:'#3a4a2a',stock:'#3a4a2a',mag:1,heavy:1,snd:'bang'},
+  crossbow:{n:'Crossbow',ic:'🏹',len:5,dmg:45,rate:45,kick:3,range:1500,col:'#6b4423',xbow:1,arrow:1,snd:'twang'},
+  bow:{n:'Bow',ic:'🏹',len:5,dmg:30,rate:35,kick:2,range:1300,col:'#8a5a2a',bow:1,arrow:1,snd:'twang'},
+  flamethrower:{n:'Flamethrower',ic:'🔥',len:5,dmg:0,rate:2,auto:1,kick:.3,range:0,col:'#6a6a6a',tank:'#c1121f',flame:1,snd:'fire'},
+  gl:{n:'Grenade launcher',ic:'💣',len:5,rate:45,kick:8,range:0,col:'#3d4a2f',lob:1,heavy:1,snd:'thoonk'},
+  freeze:{n:'Freeze ray',ic:'❄️',len:4,dmg:0,rate:30,kick:1,range:1200,col:'#e8f6ff',laser:'#6fe0ff',fins:1,freeze:1,snd:'zap'},
+  tesla:{n:'Tesla gun',ic:'⚡',len:4,dmg:22,rate:28,kick:2,range:700,col:'#5a5f66',laser:'#c8a8ff',fins:1,tesla:1,snd:'zap'},
+  shrink:{n:'Shrink ray',ic:'🔻',len:4,dmg:0,rate:25,kick:1,range:1200,col:'#ffe0f0',laser:'#ff4fd8',fins:1,shrink:1,snd:'zap'},
+  grow:{n:'Grow ray',ic:'🔺',len:4,dmg:0,rate:25,kick:1,range:1200,col:'#e0ffe0',laser:'#4fff6a',fins:1,grow:1,snd:'zap'},
+  bubble:{n:'Bubble gun',ic:'🫧',len:4,dmg:0,rate:6,auto:1,kick:.2,range:0,col:'#7ad0ff',tank:'#ff7ab8',bubbles:1,toy:1,snd:'squirt'},
+  confetti:{n:'Confetti cannon',ic:'🎉',len:4,dmg:0,rate:30,kick:4,range:0,col:'#ff4d6d',tank:'#ffd23f',confetti:1,toy:1,snd:'pop'},
+  paint:{n:'Paint gun',ic:'🎨',len:4,dmg:0,rate:10,kick:1,range:900,col:'#3a8ad8',tank:'#ff3b8a',paint:1,toy:1,snd:'thup'},
+  // old-time weapons
+  musket:{n:'Musket',ic:'🪖',len:9,dmg:55,rate:120,kick:12,range:1100,col:'#3a3a3a',stock:'#7a4a22',longStock:1,snd:'boom'},
+  flintlock:{n:'Flintlock pistol',ic:'🏴‍☠️',len:4,dmg:35,rate:90,kick:8,range:700,col:'#3a3a3a',grip:'#7a4a22',snd:'boom'},
+  blunderbuss:{n:'Blunderbuss',ic:'🎺',len:6,dmg:8,pellets:9,spread:.3,rate:110,kick:14,range:450,col:'#b8862a',stock:'#7a4a22',flare:1,snd:'boom'},
+});
+const MORE_GUN_KEYS=['deagle','ak','lmg','crossbow','bow','flamethrower','gl','freeze','tesla','shrink','grow','bubble','confetti','paint','musket','flintlock','blunderbuss'];
+const MORE_GUN_ITEMS=MORE_GUN_KEYS.map(k=>{const g=GUNS[k];return{id:'gun:'+k,ic:g.ic,n:g.n,h:'<b>'+g.n+'</b> — hold the 🔴 FIRE button to shoot'+(
+  g.flame?' (sets things on fire)':g.lob?' — lobs grenades':g.freeze?' — freezes whatever it hits':g.tesla?' — lightning that jumps between targets':g.shrink?' — makes things smaller':g.grow?' — makes things BIGGER':g.bubbles?' — blows bubbles':g.confetti?' — party time!':g.paint?' — paints birds and animals':g.arrow?' — arrows!':['musket','flintlock','blunderbuss'].includes(k)?' — old-time weapon, slow to reload':'')}});
+// special fire modes (checked first)
+const _fireGun0=fireGun;
+fireGun=function(b){
+  const g=GUNS[b.kind];if(b.cd>0||b.dead)return;
+  if(!(g.flame||g.lob||g.freeze||g.tesla||g.shrink||g.grow||g.bubbles||g.confetti||g.paint||g.arrow))return _fireGun0(b);
+  b.cd=g.rate;const {ux,uy,m}=gunDir(b),skip=new Set([b]);if(b.holder)skip.add(b.holder);const mx=m.x+ux*8,my=m.y+uy*8;
+  specialSound(g,mx);
+  if(g.flame){for(let i=0;i<3;i++){const a=Math.atan2(uy,ux)+rand(-.12,.12),v=rand(6,9);fx.push({t:'flame',x:mx,y:my,vx:Math.cos(a)*v,vy:Math.sin(a)*v-.5,life:1})}
+    const h=rayHit(mx,my,ux,uy,170,skip);if(h.p&&Math.random()<.25)ignite(h.p.body);if(h.p&&h.p.body.type==='bird'&&h.p.body.alive&&frameNo%6===0)hurt(h.p.body,2,true);
+    if(Math.random()<.1)igniteNear(h.x,h.y,20,.4);return}
+  if(g.lob){const q=spawnXpl('grenade',mx+ux*6,my+uy*6);q.fuse=100;q.lit=true;q.ps[0].px=q.ps[0].x-ux*14*DT;q.ps[0].py=q.ps[0].y-uy*14*DT;
+    for(const p of b.ps)addVel(p,-ux*g.kick*.35,-uy*g.kick*.35);for(let i=0;i<6;i++)fx.push({t:'smoke',x:mx,y:my,vx:ux*rand(1,3),vy:uy*rand(1,3),life:.6,s:rand(5,9)});return}
+  if(g.bubbles){for(let i=0;i<2;i++)bubbles.push({x:mx,y:my,vx:ux*rand(2,4)+rand(-.5,.5),vy:uy*rand(2,4)-rand(.3,1),r:rand(5,12),life:rand(4,8),h:rand(0,360)});return}
+  if(g.confetti){const cols=['#ff4d6d','#ffd23f','#4cc9f0','#8ac926','#b388ff','#ff9f1c'];for(let i=0;i<40;i++){const a=Math.atan2(uy,ux)+rand(-.4,.4),v=rand(4,10);fx.push({t:'spark',x:mx,y:my,vx:Math.cos(a)*v,vy:Math.sin(a)*v,life:1.2,col:cols[i%6],big:1})}
+    const h=rayHit(mx,my,ux,uy,250,skip);if(h.p){const o=h.p.body;if(o.type==='bird'&&o.alive)fx.push({t:'heart',x:h.x,y:h.y-20,vy:-1,life:1});addVel(h.p,ux*4,uy*4)}
+    for(const p of b.ps)addVel(p,-ux*g.kick*.35,-uy*g.kick*.35);return}
+  const h=rayHit(mx,my,ux,uy,g.range,skip),o=h.p&&h.p.body;
+  if(g.arrow){fx.push({t:'tracer',x:mx,y:my,x2:h.x,y2:h.y,life:1,col:'#c9a06a',w:2.2});
+    if(o){bulletHit({...g,laser:null},h.p,ux,uy,h.x,h.y)}else fx.push({t:'arrowStuck',x:h.x,y:h.y,a:Math.atan2(uy,ux),life:1});return}
+  const col=g.laser;
+  if(g.tesla){let x0=mx,y0=my,x1=h.x,y1=h.y;const hits=new Set();let cur=o?h.p:null;
+    zigzag(x0,y0,x1,y1,col);
+    for(let n=0;n<4&&cur;n++){const ob=cur.body;hits.add(ob);bulletHit(g,cur,ux,uy,cur.x,cur.y);if(ob.type==='bird'&&ob.alive)ob.stun=Math.max(ob.stun||0,1);
+      let best=null,bd=180;for(const q of bodies){if(hits.has(q)||q.dead||skip.has(q)||(q.type!=='bird'&&q.type!=='animal'&&!METAL.has(q.type)))continue;const cc=q.type==='bird'?q.U:q.type==='animal'?q.C:q.ps[0];const dd=Math.hypot(cc.x-cur.x,cc.y-cur.y);if(dd<bd){bd=dd;best=cc}}
+      if(best){zigzag(cur.x,cur.y,best.x,best.y,col)}cur=best}
+    flash=Math.max(flash,.08);return}
+  fx.push({t:'tracer',x:mx,y:my,x2:h.x,y2:h.y,life:1,col,w:4,laser:true});
+  if(!o)return;
+  if(g.freeze){freezeBody(o);for(let i=0;i<10;i++)fx.push({t:'spark',x:h.x,y:h.y,vx:rand(-3,3),vy:rand(-3,3),life:.6,col:'#e8fbff'})}
+  if(g.shrink||g.grow){if(o.type!=='branch'&&o.type!=='anchor'){const sc=o.scale||1,k=g.grow?1.25:.8;if((g.grow&&sc<3)||(g.shrink&&sc>.3)){scaleBody(o,k);tone('sine',g.grow?300:900,g.grow?150:1800,.25,.06,null,h.x)}
+    for(let i=0;i<10;i++)fx.push({t:'spark',x:h.x,y:h.y,vx:rand(-3,3),vy:rand(-3,3),life:.6,col})}}
+  if(g.paint&&(o.type==='bird'||o.type==='animal')){o.paint=(o.paint==null?0:o.paint+1)%PAINTS.length;o._alKey=null;for(let i=0;i<10;i++)fx.push({t:'drop',x:h.x,y:h.y,vx:rand(-2,2),vy:rand(-3,0),life:.6})}
+};
+function zigzag(x0,y0,x1,y1,col){const n=8;let px=x0,py=y0;for(let i=1;i<=n;i++){const t=i/n,x=x0+(x1-x0)*t+(i<n?rand(-12,12):0),y=y0+(y1-y0)*t+(i<n?rand(-12,12):0);fx.push({t:'tracer',x:px,y:py,x2:x,y2:y,life:1,col,w:2.5,laser:true});px=x;py=y}}
+function specialSound(g,x){if(!okSnd('sgun',g.auto?60:30))return;
+  if(g.flame)noise(.15,.12,700,'lowpass',x);else if(g.lob){tone('sine',180,90,.15,.12,null,x);noise(.1,.2,600,'lowpass',x)}
+  else if(g.arrow){tone('triangle',220,140,.15,.08,null,x);noise(.08,.05,2000,'bandpass',x,3)}
+  else if(g.tesla){noise(.25,.25,4000,'highpass',x);tone('sawtooth',90,70,.25,.06,null,x)}
+  else if(g.confetti){noise(.15,.4,1800,'bandpass',x);for(let i=0;i<5;i++)tone('sine',800+i*200,1200+i*200,.08,.02,null,x,i*.05)}
+  else if(g.bubbles)tone('sine',600,1200,.06,.015,null,x);
+  else if(g.paint)tone('sine',500,200,.08,.06,null,x);
+  else tone('sawtooth',1600,300,.14,.06,900,x)}
+// draw the new gun shapes
+const _drawGun0=drawGun;
+drawGun=function(c,b){const g=GUNS[b.kind];if(!(g.bow||g.xbow||g.flare||g.longStock||g.curveMag))return _drawGun0(c,b);
+  const ps=b.ps,a0=ps[0],m=ps[ps.length-1],ang=Math.atan2(m.y-a0.y,m.x-a0.x),L=Math.hypot(m.x-a0.x,m.y-a0.y)/1.4;
+  c.save();c.translate(a0.x,a0.y);c.rotate(ang);if(Math.cos(ang)<0)c.scale(1,-1);c.scale(1.4,1.4);c.lineCap='round';c.lineJoin='round';
+  const ready=b.cd<=0;
+  if(g.bow){c.strokeStyle=g.col;c.lineWidth=3;c.beginPath();c.moveTo(L*.45,-16);c.quadraticCurveTo(L*.8,0,L*.45,16);c.stroke();c.strokeStyle='#eee';c.lineWidth=.8;c.beginPath();c.moveTo(L*.45,-16);c.lineTo(ready?L*.2:L*.42,0);c.lineTo(L*.45,16);c.stroke();
+    if(ready){c.strokeStyle='#8a6a3a';c.lineWidth=1.6;c.beginPath();c.moveTo(L*.2,0);c.lineTo(L+4,0);c.stroke();c.fillStyle='#9aa0a8';c.beginPath();c.moveTo(L+8,0);c.lineTo(L+2,-3);c.lineTo(L+2,3);c.fill()}
+    c.fillStyle='#5a3a1a';c.fillRect(L*.5-2,-3,5,6)}
+  else if(g.xbow){c.fillStyle=g.col;rr(c,-6,-3,L+6,6,2);c.fill();c.strokeStyle='#3a3a3a';c.lineWidth=2.4;c.beginPath();c.moveTo(L*.75,-13);c.quadraticCurveTo(L*.95,0,L*.75,13);c.stroke();
+    c.strokeStyle='#ddd';c.lineWidth=.8;c.beginPath();c.moveTo(L*.75,-13);c.lineTo(ready?L*.35:L*.72,0);c.lineTo(L*.75,13);c.stroke();
+    if(ready){c.strokeStyle='#8a6a3a';c.lineWidth=1.6;c.beginPath();c.moveTo(L*.35,-1);c.lineTo(L+6,-1);c.stroke();c.fillStyle='#9aa0a8';c.beginPath();c.moveTo(L+10,-1);c.lineTo(L+4,-4);c.lineTo(L+4,2);c.fill()}
+    c.fillStyle='#4a2e14';c.beginPath();c.moveTo(6,3);c.lineTo(12,3);c.lineTo(10,14);c.lineTo(4,14);c.fill()}
+  else{ // musket / blunderbuss / assault rifle
+    if(g.stock){c.fillStyle=g.stock;c.beginPath();c.moveTo(-8,-4);c.lineTo(g.longStock?L*.75:10,-4);c.lineTo(g.longStock?L*.75:10,3);c.lineTo(-6,4);c.lineTo(-10,10);c.lineTo(-12,-2);c.closePath();c.fill()}
+    c.fillStyle=g.flare?'#b8862a':g.col;c.fillRect(4,-6,L,3.4);
+    if(g.flare){c.beginPath();c.moveTo(L+2,-6);c.lineTo(L+10,-10);c.lineTo(L+10,1);c.lineTo(L+2,-2.6);c.closePath();c.fill()}
+    if(g.curveMag){c.fillStyle='#1a1a1a';c.beginPath();c.moveTo(L*.35,0);c.lineTo(L*.35+7,0);c.quadraticCurveTo(L*.35+12,8,L*.35+8,14);c.lineTo(L*.35+3,13);c.quadraticCurveTo(L*.35+5,7,L*.35,0);c.fill();
+      c.fillStyle=g.col;rr(c,-2,-7,L*.55,9,2);c.fill();c.fillStyle=g.stock;rr(c,L*.6,-5.5,L*.25,5,2);c.fill()}
+    c.fillStyle='#2a2a2a';c.fillRect(6,-2,4,2);c.fillStyle=g.grip||'#4a2e14';c.beginPath();c.moveTo(8,0);c.lineTo(13,0);c.lineTo(11,10);c.lineTo(6,10);c.fill()}
+  c.restore();
+  if(g.auto&&b.firing&&!b.holder){c.fillStyle='#ff3b3b';circle(c,a0.x,a0.y-12,2.5)}
+};
+
 /* =================== UNDO =================== */
 const undoStack=[];
 function pushUndo(){
@@ -4390,7 +4597,7 @@ const POWERS=[
 ITEMS.push(...NEW_ITEMS,...MORE_ITEMS);
 const WEAPON_IDS=['cannon','anvil'],BOMB_IDS=['bomb','tnt'];
 const BOMBS_TAB=[...BOMB_IDS.map(id=>ITEMS.find(it=>it.id===id)).filter(Boolean),...BOMB_ITEMS];for(const id of BOMB_IDS){const i=ITEMS.findIndex(it=>it.id===id);if(i>=0)ITEMS.splice(i,1)}
-const WEAPONS=[...GUN_ITEMS,...SWORD_ITEMS,...WEAPON_IDS.map(id=>ITEMS.find(it=>it.id===id)).filter(Boolean),...[WORLD.find(it=>it.id==='sling')].filter(Boolean).map(it=>({...it}))];
+const WEAPONS=[...GUN_ITEMS,...MORE_GUN_ITEMS,...SWORD_ITEMS,...WEAPON_IDS.map(id=>ITEMS.find(it=>it.id===id)).filter(Boolean),...[WORLD.find(it=>it.id==='sling')].filter(Boolean).map(it=>({...it}))];
 for(const id of WEAPON_IDS){const i=ITEMS.findIndex(it=>it.id===id);if(i>=0)ITEMS.splice(i,1)}TOOLS.push(...CAM_TOOLS);
 let tab='birds';
 const itemsEl=document.getElementById('items'),hintEl=document.getElementById('hint'),setEl=document.getElementById('settings');
@@ -4407,7 +4614,8 @@ function buildItems(){
     tab==='weapons'?WEAPONS.map(it=>({...it,kind:'spawn'})):tab==='bombs'?BOMBS_TAB.map(it=>({...it,kind:'spawn'})):tab==='build'?BUILD_TAB.map(it=>({...it,kind:'spawn'})):tab==='animals'?ANIMAL_TAB.map(it=>({...it,kind:'spawn'})):tab==='plants'?PLANTS.map(it=>({...it,kind:'spawn'})):tab==='items'?ITEMS.map(it=>({...it,kind:'spawn'})):tab==='world'?WORLD.map(it=>({kind:'spawn',...it})):tab==='powers'?POWERS.map(t=>({...t,kind:'tool'})):TOOLS.map(t=>({...t,kind:'tool'}));
   const sres=searchList(searchQ);
   for(const it of (sres||list)){
-    if(!sres&&tab==='birds'&&(it.id==='bird:7'||it.id==='bird:'+FIRST_NEW_BIRD||it.id==='bird:'+FIRST_NEW_BIRD2||it.id==='bird:'+FIRST_NEW_BIRD3||it.id==='bird:'+FIRST_EXTINCT)){const sp=document.createElement('div');sp.textContent=it.id==='bird:7'?'Species →':it.id==='bird:'+FIRST_NEW_BIRD?'New! →':it.id==='bird:'+FIRST_NEW_BIRD2?'Newest →':it.id==='bird:'+FIRST_EXTINCT?'Extinct 🦴 →':'Your other birds & more →';sp.style.cssText='flex:0 0 auto;writing-mode:vertical-rl;transform:rotate(180deg);color:#9fb3cf;font-size:11px;font-weight:700;text-align:center;padding:0 2px';itemsEl.appendChild(sp)}
+    if(it.sep){if(!sres){const sp=document.createElement('div');sp.textContent=it.sep;sp.style.cssText='flex:0 0 auto;writing-mode:vertical-rl;transform:rotate(180deg);color:#9fb3cf;font-size:11px;font-weight:700;text-align:center;padding:0 2px';itemsEl.appendChild(sp)}continue}
+    if(!sres&&tab==='birds'&&(it.id==='bird:7'||it.id==='bird:'+FIRST_NEW_BIRD||it.id==='bird:'+FIRST_NEW_BIRD2||it.id==='bird:'+FIRST_NEW_BIRD3||it.id==='bird:'+FIRST_EXTINCT||it.id==='bird:'+FIRST_MORE)){const sp=document.createElement('div');sp.textContent=it.id==='bird:7'?'Species →':it.id==='bird:'+FIRST_NEW_BIRD?'New! →':it.id==='bird:'+FIRST_NEW_BIRD2?'Newest →':it.id==='bird:'+FIRST_EXTINCT?'Extinct 🦴 →':it.id==='bird:'+FIRST_MORE?'Even more birds →':'Your other birds & more →';sp.style.cssText='flex:0 0 auto;writing-mode:vertical-rl;transform:rotate(180deg);color:#9fb3cf;font-size:11px;font-weight:700;text-align:center;padding:0 2px';itemsEl.appendChild(sp)}
     const btn=document.createElement('button');btn.className='it'+(mode.id===it.id?' on':'');
     if(it.icon){btn.appendChild(it.icon)}else{const s=document.createElement('span');s.className='ic';s.textContent=it.ic;btn.appendChild(s)}
     const l=document.createElement('span');l.textContent=it.n;btn.appendChild(l);
