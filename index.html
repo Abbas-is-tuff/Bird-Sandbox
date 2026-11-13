@@ -229,12 +229,13 @@ function makePond(cx,w){
   const pd={x,w,d:Math.max(30,H-panelH()-groundY-8),cols,n};ponds.push(pd);return pd;
 }
 function surfaceAt(x,y){
-  let best=groundY;
+  let best=typeof terrainOn!=='undefined'&&terrainOn?gAt(x):groundY;
   for(const w of walls){if(w.trunk||w.pole||w.lampCap||w.ptrunk)continue;if(x<w.x||x>w.x+w.w)continue;if(w.y>=y-30&&w.y<best)best=w.y}
   return best;
 }
-function snapY(x,y,h){const sb=surfaceAt(x,y);return sb-y<50?sb-h:Math.min(y,groundY)-h/2}
+function snapY(x,y,h){const sb=surfaceAt(x,y);return sb-y<50?sb-h:Math.min(y,typeof terrainOn!=='undefined'&&terrainOn?gAt(x):groundY)-h/2}
 function makeTree(x,base=groundY){
+  if(typeof terrainOn!=='undefined'&&terrainOn)base=Math.min(base,gAt(x)+2);
   const id=treeId++,h=clamp(base-110,90,270),tx=x;
   const trunk={x:tx-11,y:base-h,w:22,h,trunk:true,tree:id};walls.push(trunk);
   const t={id,x:tx,h,base,branches:[],trunk,leafSeed:Math.random()*1000};trees.push(t);
@@ -556,6 +557,8 @@ function statics(p){
   if(p.y-r<0&&(G<0||p.buoy)){p.y=r;contact(p,0,1)}
   for(const w of walls){
     if(p.x+r<w.x||p.x-r>w.x+w.w||p.y+r<w.y||p.y-r>w.y+w.h)continue;
+    if(w.ledge&&p.py+r>w.y+3)continue; // mountain ledges: only stand on them from above
+    if((w.ptrunk||w.trunk)&&(p.body.type==='animal'||p.body.type==='car'))continue; // animals & cars walk past tree trunks
     const cx=clamp(p.x,w.x,w.x+w.w),cy=clamp(p.y,w.y,w.y+w.h),dx=p.x-cx,dy=p.y-cy,d2=dx*dx+dy*dy;
     if(d2>=r*r)continue;
     if(d2>1e-6){const d=Math.sqrt(d2),nx=dx/d,ny=dy/d;p.x=cx+nx*r;p.y=cy+ny*r;contact(p,nx,ny,w)}
@@ -2282,7 +2285,7 @@ const SPHERES=new Set(['ball','melon','bomb','pumpkin','apple','coconut','bowl',
 
 /* ---- plants ---- */
 function makePlant(kind,x,base,o={}){
-  x=x;
+  if(typeof terrainOn!=='undefined'&&terrainOn)base=Math.min(base,gAt(x)+2);
   const pl=Object.assign({kind,x,base,seed:Math.random()*1000,t:rand(5,12),walls:[]},o);
   const wall=w=>{w.plant=true;w.pl=pl;walls.push(w);pl.walls.push(w);return w};
   switch(kind){
@@ -2972,7 +2975,10 @@ function animalAI(b,dt){
   if(d.hopper&&walk){if(Math.random()<(d.frog?.012:.03)*dt&&FF.touch)animalJump(b,b.f*d.spd*(run?2:1.3),d.jump*(run?.9:.7)*str)}
   else if(walk&&legs){
     const want=b.f*d.spd*s*(1+run)*(d.turtle?.6:1)*(legs<2?.4:1);b.ph+=dt*.28*(1+run);
-    for(const p of [C,Hp,Hd]){const[vx]=vel(p);addVel(p,(want-vx)*.25*dt,0)}
+    if(terrainOn&&tH(C.x)>2){ // walking on a slope: push along the hill, and help a bit going uphill
+      const dg=(gAt(C.x+6)-gAt(C.x-6))/12,l=Math.hypot(1,dg),tx=1/l,ty=dg/l;
+      for(const p of [C,Hp,Hd,FF,BF]){const[vx,vy]=vel(p),along=vx*tx+vy*ty;addVel(p,(want-along)*.25*dt*tx,(want-along)*.25*dt*ty);if(want*dg<0)addVel(p,0,-G*.5*Math.min(1,Math.abs(ty))*dt)}
+    } else for(const p of [C,Hp,Hd]){const[vx]=vel(p);addVel(p,(want-vx)*.25*dt,0)}
     if(Math.sin(b.ph)*Math.sin(b.ph-dt*.28)<0&&!d.mouse&&!d.turtle&&okSnd('pawstep',180))stepSound(C.x);
   }
   const st=walk&&!d.hopper?Math.sin(b.ph):0,lift=walk&&!d.hopper?Math.max(0,Math.cos(b.ph)):0;
@@ -3004,6 +3010,10 @@ function pickAnimalAct(b){
   if(food&&Math.random()<.7){b.act='eat';b.target=food;b.actT=6;return}
   if(night&&!d.frog&&r<.5){b.act='sleep';b.actT=rand(6,12);return}
   if(d.curl&&r<.3&&nearestOf(b,o=>o.type==='animal'&&o.alive&&(o.def.cat||o.def.hunter||o.def.dog),180)){b.act='shell';b.actT=rand(3,6);return}
+  if(d.dino){ // dinosaurs are always on the move
+    if(d.hunter&&r<.35&&b.coolT<=0){const t=nearestOf(b,o=>(o.type==='bird'&&o.alive&&o.flyT<=0&&!o.inHouse)||(o.type==='animal'&&o!==b&&o.alive&&!o.def.dino&&o.def.mass<d.mass),600);if(t){b.act='stalk';b.target=t;b.actT=8;animalSound(b);return}}
+    if(r<.88){b.act='walk';b.actT=rand(3,7);if(Math.random()<.35)b.f*=-1;if(Math.random()<.25)animalSound(b);return}
+    b.act='idle';b.actT=rand(.8,1.8);return}
   if(d.cat||d.hunter){
     if(r<.3&&b.coolT<=0){const t=nearestOf(b,o=>(o.type==='bird'&&o.alive&&o.flyT<=0&&!o.inHouse&&(o.F1.touch||o.F2.touch||o.U.sub>0))||(o.type==='animal'&&(o.def.mouse||o.def.prey)&&o.alive),450);if(t){b.act='stalk';b.target=t;b.actT=8;return}}
     if(r<.42){const t=nearestOf(b,o=>['ball','beach','duck','berry'].includes(o.type),400);if(t){b.act='play';b.target=t;b.actT=5;return}}
@@ -4369,7 +4379,7 @@ drawGun=function(c,b){const g=GUNS[b.kind];if(!(g.bow||g.xbow||g.flare||g.longSt
 };
 
 /* =================== MOUNTAIN TERRAIN =================== */
-let terrainOn=false,MTN_X0=0;const MTN_SP=12000,mtnPeaks=new Map();
+var terrainOn=false,MTN_X0=0;const MTN_SP=12000,mtnPeaks=new Map();
 function mtnPeak(i){
   if(mtnPeaks.has(i))return mtnPeaks.get(i);
   const R=rng(i*7331+17);let pk;
@@ -4406,7 +4416,7 @@ function drawMountain(c){
   c.save();c.clip();
   // rocky streaks
   c.strokeStyle=mix('rgba(0,0,0,.14)','rgba(60,50,40,.16)',light);c.lineWidth=3;
-  for(let x=Math.floor(x0/90)*90;x<x1;x+=90){const h=tH(x);if(h<80)continue;const y=gAt(x);c.beginPath();c.moveTo(x,y+20);c.lineTo(x+18,y+60+(x%7)*8);c.stroke()}
+  for(let x=Math.floor(x0/90)*90;x<x1;x+=90){const h=tH(x);if(h<1500)continue;const y=gAt(x);c.beginPath();c.moveTo(x,y+20);c.lineTo(x+18,y+60+(x%7)*8);c.stroke()}
   // snow cap
   c.fillStyle=mix('#9aa6ba','#f6f9ff',light);c.beginPath();c.moveTo(x0,groundY-12000);
   for(let x=x0;x<=x1;x+=8)c.lineTo(x,groundY-3000+Math.sin(x*.02)*30+Math.sin(x*.005)*80);
