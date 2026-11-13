@@ -35,6 +35,9 @@ html,body{margin:0;height:100%;overflow:hidden;background:#87ceeb;touch-action:n
 #info{position:fixed;left:calc(env(safe-area-inset-left) + 10px);top:calc(env(safe-area-inset-top) + 110px);width:220px;background:rgba(24,33,48,.95);color:#fff;border-radius:14px;padding:10px 12px;z-index:7;font-size:13px;display:none;box-shadow:0 6px 20px rgba(0,0,0,.35)}
 #info{touch-action:auto}#info input{-webkit-user-select:text;user-select:text}
 #info b{color:#ffd54a}#info .bar{height:7px;border-radius:4px;background:#333;margin:3px 0 7px;overflow:hidden}#info .bar i{display:block;height:100%}
+#fireBtn{position:fixed;right:calc(env(safe-area-inset-right) + 16px);bottom:150px;width:104px;height:104px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ff6b5b,#c1121f);color:#fff;display:none;flex-direction:column;align-items:center;justify-content:center;z-index:7;box-shadow:0 6px 18px rgba(0,0,0,.35),inset 0 -5px 0 rgba(0,0,0,.25);border:3px solid rgba(255,255,255,.85);user-select:none;-webkit-user-select:none;touch-action:none;font-family:system-ui}
+#fireBtn b{font-size:18px;letter-spacing:1px}#fireBtn #fireIc{font-size:30px;line-height:1}#fireBtn.on{transform:scale(.92);background:radial-gradient(circle at 35% 30%,#ffb35b,#e2541f)}
+#fireX{position:absolute;top:-6px;right:-6px;width:28px;height:28px;border-radius:50%;background:#1c2636;color:#fff;font-style:normal;font-size:14px;display:flex;align-items:center;justify-content:center;border:2px solid #fff}
 #toast{position:fixed;left:50%;top:40%;transform:translate(-50%,-50%);background:rgba(20,30,45,.85);color:#fff;padding:14px 20px;border-radius:16px;font-size:18px;font-weight:700;z-index:9;opacity:0;transition:opacity .4s;pointer-events:none;text-align:center}
 #settings{position:fixed;top:calc(env(safe-area-inset-top) + 64px);right:calc(env(safe-area-inset-right) + 8px);width:min(340px,92vw);max-height:62vh;overflow-y:auto;background:rgba(24,33,48,.97);color:#fff;border-radius:16px;padding:12px 14px 14px;z-index:8;box-shadow:0 8px 30px rgba(0,0,0,.4);touch-action:pan-y;display:none}
 #settings.open{display:block}
@@ -115,6 +118,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#87ceeb;touch-action:n
   <div id="items"></div>
 </div>
 <div id="toast"></div>
+<div id="fireBtn"><span id="fireIc">🔫</span><b>FIRE</b><i id="fireX">✕</i></div>
 <div id="info"></div>
 <script>
 "use strict";
@@ -3858,15 +3862,15 @@ const GUNS={
   water:{n:'Water gun',ic:'💦',len:4,dmg:0,rate:4,auto:1,kick:.5,range:500,col:'#2fa4ff',tank:'#ffb020',water:1,toy:1,snd:'squirt'},
   nerf:{n:'Foam blaster',ic:'🧡',len:4,dmg:0,rate:16,kick:2,range:700,col:'#ff7a1a',tank:'#2f6bff',nerf:1,toy:1,snd:'thup'},
 };
-const GUN_ITEMS=Object.entries(GUNS).map(([k,g])=>({id:'gun:'+k,ic:g.ic,n:g.n,h:'<b>'+g.n+'</b> — '+(g.auto?'tap it to start / stop firing':'tap it to shoot')+
+const GUN_ITEMS=Object.entries(GUNS).map(([k,g])=>({id:'gun:'+k,ic:g.ic,n:g.n,h:'<b>'+g.n+'</b> — hold the 🔴 FIRE button to shoot (or tap the gun)'+
   (g.water?' (puts out fires, soaks birds)':g.nerf?' (foam darts just bonk)':g.rocket?' — rockets explode on hit!':'')+'. Drag to aim · 🔒 2nd finger locks the angle. Drop it by a bird and they use it!'}));
 function makeGun(kind,x,y){
-  const g=GUNS[kind],b=newBody('gun',{kind,holder:null,dropT:0,cd:0,firing:false,shootT:rand(1,2)});const n=g.len,sp=8;
-  for(let i=0;i<n;i++)b.ps.push(new P(x-((n-1)/2)*sp+i*sp,y,i===0?4.5:3.8,b,{im:g.heavy?.3:.8,fric:.5,dens:g.heavy?3:1.6,rest:.15}));
+  const g=GUNS[kind],b=newBody('gun',{kind,holder:null,dropT:0,cd:0,firing:false,shootT:rand(1,2)});const n=g.len,sp=11;
+  for(let i=0;i<n;i++)b.ps.push(new P(x-((n-1)/2)*sp+i*sp,y,i===0?6:5,b,{im:g.heavy?.3:.8,fric:.5,dens:g.heavy?3:1.6,rest:.15}));
   for(let i=0;i<n;i++)for(let j=i+1;j<n;j++)stick(b,b.ps[i],b.ps[j]);return b;
 }
 function gunSpawn(id,x,y){
-  if(id.startsWith('gun:')){const k=id.slice(4);if(!GUNS[k])return undefined;const b=add(makeGun(k,x,y));tone('triangle',900,700,.08,.04,null,x);noise(.05,.1,3000,'highpass',x);return b}
+  if(id.startsWith('gun:')){const k=id.slice(4);if(!GUNS[k])return undefined;const b=add(makeGun(k,x,y));setGun(b);tone('triangle',900,700,.08,.04,null,x);noise(.05,.1,3000,'highpass',x);return b}
   if(id.startsWith('xpl:')){const k=id.slice(4);if(!XPL[k])return undefined;return spawnXpl(k,x,y)}
   return false;
 }
@@ -3969,10 +3973,10 @@ function gunUpdate(dt){
           fx.push({t:'text',x:hp.x,y:hp.y-30,vy:-.7,life:1.2,txt:(o.name||(o.def.name||o.def.n))+' got the '+g.n.toLowerCase()+'! 😎'});tone('triangle',1500,2200,.15,.04,null,hp.x);break}}
     }
   }
-  xplUpdate(dt);
+  xplUpdate(dt);gunUI();
 }
 function gunActivate(b){
-  if(b.type==='gun'){const g=GUNS[b.kind];if(b.holder){const h=b.holder;b.holder=null;b.dropT=3;b.firing=false;toast((h.name||h.def.name||h.def.n)+' dropped the '+g.n.toLowerCase());return true}
+  if(b.type==='gun'){setGun(b);const g=GUNS[b.kind];if(b.holder){const h=b.holder;b.holder=null;b.dropT=3;b.firing=false;toast((h.name||h.def.name||h.def.n)+' dropped the '+g.n.toLowerCase());return true}
     if(g.auto){b.firing=!b.firing;if(b.firing)fireGun(b)}else fireGun(b);return true}
   if(b.type==='xpl'){const X=XPL[b.kind];
     if(b.kind==='c4'){let n=0;for(const o of bodies)if(o.type==='xpl'&&o.kind==='c4'&&!o.dead){n++;o.lit=true;o.fuse=6+n*4}tone('square',1200,1200,.08,.04,null,b.ps[0].x);toast('💥 Detonating '+n+' C4');return true}
@@ -3980,6 +3984,16 @@ function gunActivate(b){
     if(X.impact)return true;if(!b.lit){b.lit=true;fuseHiss(b.ps[0].x)}else b.fuse=Math.min(b.fuse,40);return true}
   return false;
 }
+// ---- big FIRE button for the gun you last touched ----
+let activeGun=null;const fireBtn=document.getElementById('fireBtn');
+function setGun(b){activeGun=b;fireBtn.style.display='flex';document.getElementById('fireIc').textContent=GUNS[b.kind].ic}
+function gunUI(){if(activeGun&&(activeGun.dead||!bodies.includes(activeGun))){activeGun=null;fireBtn.style.display='none'}}
+fireBtn.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();unlockAudio();
+  if(e.target.id==='fireX'){if(activeGun)activeGun.firing=false;activeGun=null;fireBtn.style.display='none';return}
+  const b=activeGun;if(!b||b.dead)return;fireBtn.classList.add('on');
+  if(GUNS[b.kind].auto){b.firing=true;b.btnHold=true;fireGun(b)}else{b.cd=0;fireGun(b)}});
+const fireUp=e=>{fireBtn.classList.remove('on');if(activeGun&&activeGun.btnHold){activeGun.firing=false;activeGun.btnHold=false}};
+fireBtn.addEventListener('pointerup',fireUp);fireBtn.addEventListener('pointercancel',fireUp);fireBtn.addEventListener('pointerleave',fireUp);
 function fuseHiss(x){if(okSnd('fuse',200))noise(.4,.06,5000,'highpass',x)}
 /* =================== EXPLOSIVES =================== */
 const XPL={
@@ -4074,8 +4088,8 @@ function xplUpdate(dt){
   }
 }
 function drawGun(c,b){
-  const g=GUNS[b.kind],ps=b.ps,a0=ps[0],m=ps[ps.length-1],ang=Math.atan2(m.y-a0.y,m.x-a0.x),L=Math.hypot(m.x-a0.x,m.y-a0.y);
-  c.save();c.translate(a0.x,a0.y);c.rotate(ang);if(Math.cos(ang)<0)c.scale(1,-1);
+  const g=GUNS[b.kind],ps=b.ps,a0=ps[0],m=ps[ps.length-1],ang=Math.atan2(m.y-a0.y,m.x-a0.x),L=Math.hypot(m.x-a0.x,m.y-a0.y)/1.4;
+  c.save();c.translate(a0.x,a0.y);c.rotate(ang);if(Math.cos(ang)<0)c.scale(1,-1);c.scale(1.4,1.4);
   const dark='rgba(0,0,0,.35)',body=g.col;c.lineJoin='round';
   const grip=(x,w=7,h=13,col=g.grip||'#2a2a2a')=>{c.fillStyle=col;c.beginPath();c.moveTo(x-w/2,0);c.lineTo(x+w/2,0);c.lineTo(x+w/2-2,h);c.lineTo(x-w/2-3,h);c.closePath();c.fill();c.strokeStyle=dark;c.lineWidth=1;c.stroke()};
   if(g.stock){c.fillStyle=g.stock;c.beginPath();c.moveTo(-6,-4);c.lineTo(8,-4);c.lineTo(8,4);c.lineTo(-8,9);c.closePath();c.fill();c.strokeStyle=dark;c.stroke()}
@@ -4184,14 +4198,14 @@ cv.addEventListener('pointerdown',e=>{
   const x=WX(e),y=WY(e);
   if(mode.id!=='inspect'&&mode.kind!=='spawn'&&!(mode.id==='drag'&&!pick(x,y,38)))pushUndo();
   if(mode.kind==='spawn'){
-    {const pk=pick(x,y,4);if(pk&&!pk.pinned&&pk.body.type!=='branch'){pushUndo();drags.set(e.pointerId,{p:pk,x,y,t0:performance.now(),sx:x,sy:y});return}}
+    {let pk=pick(x,y,4);if(!pk){const q=pick(x,y,22/cam.z);if(q&&(q.body.type==='gun'||q.body.type==='xpl'))pk=q}if(pk&&!pk.pinned&&pk.body.type!=='branch'){if(pk.body.type==='gun')setGun(pk.body);pushUndo();drags.set(e.pointerId,{p:pk,x,y,t0:performance.now(),sx:x,sy:y});return}}
     if(mode.id==='pond'){pushUndo();pondDraw={x0:x,x1:x,id:e.pointerId};return}
     // wait to see if this is a tap (place it), a hold (place it and drag it) or a swipe/pinch (move the camera)
     pendingSpawn={pid:e.pointerId,id:mode.id,x,y,wx:x,wy:y,sx:e.clientX,sy:e.clientY,cx:cam.x,cy:cam.y,t0:performance.now()};
     return;
   }
   switch(mode.id){
-    case 'drag':{const p=pick(x,y,38);if(p)drags.set(e.pointerId,{p,x,y,t0:performance.now(),sx:x,sy:y});else if(!popBubbleAt(x,y))startPan(e);break}
+    case 'drag':{const p=pick(x,y,38);if(p&&p.body.type==='gun')setGun(p.body);if(p)drags.set(e.pointerId,{p,x,y,t0:performance.now(),sx:x,sy:y});else if(!popBubbleAt(x,y))startPan(e);break}
     case 'follow':{const p=pick(x,y,30);if(p&&p.body.type!=='branch'){camFollow=p.body;const b=p.body;toast('🎥 Following '+(b.name||(b.def&&(b.def.name||b.def.n))||b.type))}else{camFollow=null;toast('🎥 Camera free')}break}
     case 'send':{const p=pick(x,y,24);if(!sendSel){if(p&&p.body.type!=='branch'){sendSel=p.body;toast('📍 Now tap where to send it — pinch to zoom out')}break}
       if(p&&p.body===sendSel){sendSel=null;toast('Cancelled');break}if(!sendSel.dead)sendTo(sendSel,x,y);sendSel=null;break}
