@@ -3740,7 +3740,7 @@ function animalFamilies(dt){
   if(familyT>0)return;familyT=rand(40,80);
   const an=bodies.filter(b=>b.type==='animal'&&b.alive&&!b.baby&&b.health>60&&b.stun<=0);if(an.length>45)return;
   for(const a of an)for(const c of an){if(a===c||a.kind!==c.kind||Math.hypot(a.C.x-c.C.x,a.C.y-c.C.y)>140)continue;
-    const d=ANIMALS[a.kind],x=(a.C.x+c.C.x)/2,kid=add(makeAnimal(a.kind,x,Math.min(a.C.y,c.C.y)-10,a.f));scaleBody(kid,.55);kid.baby=true;kid.born=frameNo;kid.toughT=3;
+    const d=ANIMALS[a.kind],x=(a.C.x+c.C.x)/2,kid=add(makeAnimal(a.kind,x,Math.min(a.C.y,c.C.y)-10,a.f,{breed:(Math.random()<.5?a:c).breedObj||null}));scaleBody(kid,.55);kid.baby=true;kid.born=frameNo;kid.toughT=3;
     for(let i=0;i<5;i++)fx.push({t:'heart',x:x+rand(-20,20),y:a.C.y-30-rand(0,20),vy:-1,life:1});fx.push({t:'text',x,y:a.C.y-60,vy:-.6,life:1.4,txt:'🍼 A baby '+d.n.toLowerCase()+'!'});animalSound(kid);return}
 }
 CALLX.oo=(p,x)=>{if(!okSnd('call',60))return;[[1150,1350],[1000,1250],[1200,1400],[950,1150]].forEach(([a,b2],i)=>{tone('sine',a,b2,.28,.05,null,x,i*.42);tone('triangle',a*2,b2*2,.2,.012,null,x,i*.42)})};
@@ -4577,6 +4577,98 @@ function drawCar(c,b){
   if(light<.4&&b.motor){c.save();c.globalAlpha=.25;c.fillStyle='#fff6b0';const a=carWorld(F,h2,0),d=b.motor>0?1:-1;if(d>0){c.beginPath();c.moveTo(a.x,a.y);c.lineTo(a.x+F.co*160-F.si*30,a.y+F.si*160+F.co*30);c.lineTo(a.x+F.co*160+F.si*30,a.y+F.si*160-F.co*30);c.fill()}c.restore()}
   drawWheel(c,b.w1,CARS[b.kind].wr,b.wa,C.top==='monster');drawWheel(c,b.w2,CARS[b.kind].wr,b.wa,C.top==='monster');
 }
+
+/* =================== BREEDS: every spawn can be a different look =================== */
+const CAT_BREEDS=[
+  {n:'Orange Tabby',body:'#e8892f',belly:'#f6d2a8',stripes:'#b8611c'},
+  {n:'Black Cat',body:'#232326',belly:'#2e2e33',stripes:null,ear:'#3a3a40',eye:'#ffd23f'},
+  {n:'Grey Tabby',body:'#8a8e94',belly:'#c9cdd2',stripes:'#5a5e64',ear:'#f2b0a0'},
+  {n:'Siamese',body:'#f2e8d8',belly:'#fbf6ec',dark:'#4a3a2e',ear:'#4a3a2e',tail:'#4a3a2e',legCol:'#4a3a2e',facePatch:'#4a3a2e',stripes:null,eye:'#4fa8ff'},
+  {n:'Calico',body:'#f6f2ea',belly:'#ffffff',spots:'#e8892f',stripes:null,tail:'#2a2a2a',ear:'#2a2a2a'},
+  {n:'Tuxedo',body:'#1f1f22',belly:'#f6f6f4',stripes:null,snoutCol:'#f6f6f4',legCol:'#f6f6f4',eye:'#9acd32'},
+  {n:'White Cat',body:'#fbfbf8',belly:'#ffffff',stripes:null,ear:'#f2b0a0',eye:'#4fa8ff'},
+  {n:'Persian',body:'#efe4d2',belly:'#fbf6ec',stripes:null,fluffy:true,eye:'#ff9a2a'},
+  {n:'Maine Coon',body:'#7a5a3e',belly:'#d8c4a8',stripes:'#4a3424',fluffy:true,sm:1.3},
+  {n:'Sphynx',body:'#f2c8b8',belly:'#f6d8c8',stripes:null,ear:'#e8a898',eye:'#9acd32',bigEar:true},
+  {n:'British Shorthair',body:'#7a8a9e',belly:'#8a9aae',stripes:null,roundEar:true,eye:'#ff9a2a',sm:1.1},
+  {n:'Bengal',body:'#d8a45a',belly:'#f6e2b8',spots:'#4a2e14',stripes:null},
+];
+const BREEDS={
+  orange:CAT_BREEDS,black:CAT_BREEDS,grey:CAT_BREEDS,
+  dog:[
+    {n:'Golden Retriever'},
+    {n:'Black Lab',body:'#2a2422',belly:'#3a3230',ear:'#1a1614',tail:'#2a2422'},
+    {n:'Dalmatian',body:'#fbfbf8',belly:'#ffffff',spots:'#1a1a1a',ear:'#1a1a1a',tail:'#fbfbf8'},
+    {n:'Husky',body:'#5a626c',belly:'#f4f4f2',ear:'#3a4048',snoutCol:'#f4f4f2',tail:'#5a626c',pointy:true,flop:false,eye:'#5ab0ff',fluffy:true},
+    {n:'Beagle',body:'#f4ece0',belly:'#ffffff',spots:'#8a5a2a',ear:'#8a5a2a',tail:'#f4ece0',tailTip:'#ffffff'},
+    {n:'Poodle',body:'#f6f2ea',belly:'#ffffff',ear:'#f6f2ea',tail:'#f6f2ea',fluffy:true,wool:true,sm:.85},
+    {n:'Chihuahua',body:'#d8b088',belly:'#f2dcc0',ear:'#d8b088',tail:'#d8b088',pointy:true,flop:false,bigEar:true,sm:.55},
+    {n:'Corgi',body:'#e0903a',belly:'#ffffff',ear:'#e0903a',snoutCol:'#ffffff',tail:'#e0903a',pointy:true,flop:false,legs:.55},
+    {n:'German Shepherd',body:'#3a2a1a',belly:'#c9883a',ear:'#2a1a0c',legCol:'#c9883a',snoutCol:'#2a1a0c',tail:'#3a2a1a',pointy:true,flop:false,sm:1.15},
+    {n:'Pug',body:'#e8d0a8',belly:'#f2dcc0',ear:'#2a2a2a',snoutCol:'#2a2a2a',tail:'#e8d0a8',sm:.7},
+    {n:'Great Dane',body:'#6a6e74',belly:'#7a7e84',ear:'#5a5e64',tail:'#6a6e74',sm:1.5},
+    {n:'Shiba Inu',body:'#e0903a',belly:'#fbf0dc',ear:'#e0903a',snoutCol:'#fbf0dc',tail:'#e0903a',pointy:true,flop:false,sm:.85},
+  ],
+  horse:[
+    {n:'Bay Horse'},
+    {n:'Black Horse',body:'#1f1c1a',belly:'#2a2624',legCol:'#141210',ear:'#141210',snoutCol:'#2a2624',mane:'#0a0908',tail:'#0a0908'},
+    {n:'White Horse',body:'#f4f2ee',belly:'#ffffff',legCol:'#e8e4dc',ear:'#e0dcd4',snoutCol:'#e8d8d0',mane:'#f8f8f4',tail:'#f8f8f4'},
+    {n:'Palomino',body:'#e8b860',belly:'#f2c878',legCol:'#d8a850',ear:'#c99a44',snoutCol:'#d8a850',mane:'#fbf2dc',tail:'#fbf2dc'},
+    {n:'Chestnut',body:'#a8542a',belly:'#b8643a',legCol:'#8a4420',ear:'#8a4420',snoutCol:'#984a24',mane:'#c96a3a',tail:'#c96a3a'},
+    {n:'Appaloosa',body:'#f4f0e8',belly:'#ffffff',spots:'#4a3420',legCol:'#e8e0d0',ear:'#4a3420',snoutCol:'#d8c8c0',mane:'#4a3420',tail:'#4a3420'},
+    {n:'Pinto',body:'#f6f4f0',belly:'#ffffff',spots:'#7a4a28',legCol:'#f6f4f0',ear:'#7a4a28',snoutCol:'#e8d8d0',mane:'#3a2414',tail:'#f6f4f0'},
+    {n:'Pony',body:'#8a6a4a',belly:'#9a7a5a',legCol:'#6a4a2e',mane:'#f2e8d8',tail:'#f2e8d8',sm:.65},
+    {n:'Clydesdale',body:'#6a3a1e',belly:'#7a4a2a',legCol:'#f4f2ee',ear:'#4a2410',snoutCol:'#f4f2ee',mane:'#1a0c06',tail:'#1a0c06',sm:1.25},
+  ],
+  cow:[
+    {n:'Holstein'},
+    {n:'Jersey',body:'#b8783a',belly:'#d8a870',spots:null,ear:'#8a5428',tail:'#b8783a',tailTip:'#1a1a1a'},
+    {n:'Highland Cow',body:'#b8642a',belly:'#c97438',spots:null,ear:'#b8642a',tail:'#b8642a',fluffy:true,horns:'#f2e8d0'},
+    {n:'Black Angus',body:'#1f1c1a',belly:'#2a2624',spots:null,ear:'#141210',tail:'#1f1c1a',snoutCol:'#3a3230',horns:null},
+    {n:'Hereford',body:'#9a3e1e',belly:'#ffffff',spots:null,ear:'#9a3e1e',snoutCol:'#ffffff',facePatch:'#ffffff',tail:'#9a3e1e'},
+  ],
+  pig:[{n:'Pink Pig'},{n:'Spotted Pig',spots:'#2a2a2a'},{n:'Black Pig',body:'#2a2624',belly:'#3a3432',ear:'#1f1c1a',tail:'#2a2624',snoutCol:'#e8a0a0'},{n:'Mini Pig',sm:.6},{n:'Wild Boar',body:'#5a4030',belly:'#6a5040',ear:'#3a2a1e',tail:'#5a4030',snoutCol:'#3a2a1e',fluffy:true,tusk:'#f2ecd8'}],
+  sheep:[{n:'White Sheep'},{n:'Black Sheep',body:'#2a2826',belly:'#3a3634',dark:'#1a1816'},{n:'Brown Sheep',body:'#8a6a4a',belly:'#9a7a5a'},{n:'Lamb',sm:.6}],
+  bunny:[{n:'White Bunny',body:'#fbfbf8',belly:'#ffffff',ear:'#f2b8c0',eye:'#e04060'},{n:'Brown Bunny',body:'#9a6e48',belly:'#e8d4b8'},{n:'Grey Bunny',body:'#8a8e94',belly:'#d8dce0'},{n:'Black Bunny',body:'#2a2826',belly:'#3a3634'},{n:'Dutch Bunny',body:'#ffffff',belly:'#ffffff',spots:'#2a2826',ear:'#2a2826'},{n:'Lop Bunny',body:'#d8b088',belly:'#f2dcc0',flop:true}],
+  mouse:[{n:'Grey Mouse'},{n:'White Mouse',body:'#fbfbf8',belly:'#ffffff',eye:'#e04060'},{n:'Brown Mouse',body:'#8a6040',belly:'#d8c0a0'}],
+  hamster:[{n:'Golden Hamster'},{n:'White Hamster',body:'#fbfbf8',belly:'#ffffff'},{n:'Grey Hamster',body:'#9a9ea4',belly:'#e8eaec'},{n:'Panda Hamster',body:'#ffffff',belly:'#ffffff',spots:'#2a2a2a'}],
+  goat:[{n:'White Goat'},{n:'Brown Goat',body:'#8a5a32',belly:'#9a6a42'},{n:'Black Goat',body:'#2a2624',belly:'#3a3432'},{n:'Spotted Goat',spots:'#5a3a1e'}],
+  fox:[{n:'Red Fox'},{n:'Arctic Fox',body:'#f6f8fa',belly:'#ffffff',ear:'#e8ecf0',tail:'#f6f8fa',legCol:'#e8ecf0',fluffy:true},{n:'Silver Fox',body:'#2a2c30',belly:'#5a5e64',tail:'#2a2c30',tailTip:'#ffffff'},{n:'Fennec Fox',body:'#f2d8a8',belly:'#fbf0dc',bigEar:true,sm:.7}],
+  wolf:[{n:'Grey Wolf'},{n:'White Wolf',body:'#f2f2ee',belly:'#ffffff',dark:'#d8d8d2'},{n:'Black Wolf',body:'#1f1f22',belly:'#2e2e33',dark:'#111113'},{n:'Red Wolf',body:'#a8643a',belly:'#d8b090'}],
+  bear:[{n:'Brown Bear'},{n:'Black Bear',body:'#1f1c1a',belly:'#2a2624',snoutCol:'#8a6a4a'},{n:'Grizzly',body:'#7a5a3a',belly:'#8a6a48',sm:1.2},{n:'Cinnamon Bear',body:'#a8643a',belly:'#b8744a'}],
+  deer:[{n:'Red Deer'},{n:'White-tailed Deer',body:'#a8805a',belly:'#f6efe4'},{n:'Fawn',spots:'#fbf6ec',sm:.65,antlers:null},{n:'Doe',antlers:null}],
+  lion:[{n:'Lion'},{n:'Lioness',mane:null,sm:.9},{n:'White Lion',body:'#f2ead8',belly:'#fbf6ec',mane:'#e8dcc4',tail:'#f2ead8',tailTip:'#d8c8a8'}],
+  tiger:[{n:'Bengal Tiger'},{n:'White Tiger',body:'#f6f4ee',belly:'#ffffff',eye:'#4fa8ff',tail:'#f6f4ee'},{n:'Golden Tiger',body:'#f2c060',belly:'#fff4e0',stripes:'#c98a30',tail:'#f2c060'},{n:'Siberian Tiger',sm:1.2,fluffy:true}],
+  leopard:[{n:'Leopard'},{n:'Snow Leopard',body:'#d8dce0',belly:'#f6f8fa',spots:'#3a3e44',tailTip:'#3a3e44',fluffy:true},{n:'Black Panther',body:'#1a1a1e',belly:'#222226',spots:'#0e0e10',tailTip:'#0e0e10',eye:'#ffd23f'}],
+  monkey:[{n:'Brown Monkey'},{n:'Golden Monkey',body:'#e8a83a',belly:'#f6d890'},{n:'Black Monkey',body:'#1f1f22',belly:'#2e2e33'},{n:'Grey Monkey',body:'#8a8e94',belly:'#c9cdd2'}],
+  turtle:[{n:'Green Turtle'},{n:'Red-eared Turtle',ear:'#e01e37'},{n:'Box Turtle',shell:'#7a5a2a'},{n:'Leopard Tortoise',shell:'#d8b878',spots:'#3a2a14'}],
+  frog:[{n:'Green Frog'},{n:'Poison Dart Frog',body:'#2f6bff',belly:'#1a3a9a',spots:'#111111',sm:.7},{n:'Red Frog',body:'#e01e37',belly:'#ff6a7a'},{n:'Golden Frog',body:'#ffd23f',belly:'#fff09a'}],
+  squirrel:[{n:'Red Squirrel'},{n:'Grey Squirrel',body:'#8a8e94',belly:'#f2f2ee',tail:'#8a8e94'},{n:'Black Squirrel',body:'#1f1f22',belly:'#2e2e33',tail:'#1f1f22'}],
+  kangaroo:[{n:'Red Kangaroo'},{n:'Grey Kangaroo',body:'#8a8a8a',belly:'#c9c9c9'}],
+  hedgehog:[{n:'Hedgehog'},{n:'Albino Hedgehog',spikes:'#f6f2ea',body:'#fbf6ec',eye:'#e04060'}],
+  llama:[{n:'White Llama'},{n:'Brown Llama',body:'#8a5a32',belly:'#9a6a42',dark:'#6a4422'},{n:'Black Llama',body:'#2a2624',belly:'#3a3432',dark:'#1a1816'},{n:'Alpaca',sm:.75}],
+  rhino:[{n:'White Rhino'},{n:'Black Rhino',body:'#5a5a5e',belly:'#6a6a6e',dark:'#3a3a3e'}],
+  elephant:[{n:'African Elephant'},{n:'Asian Elephant',sm:.85},{n:'Baby Elephant',sm:.5}],
+  trex:[{n:'T. rex'},{n:'Brown T. rex',body:'#7a5a3a',belly:'#c9a878',dark:'#5a3e26',scales:'#5a3e26'},{n:'Red T. rex',body:'#a83a2a',belly:'#e0a080',dark:'#7a2418',scales:'#7a2418'},{n:'Striped T. rex',stripes:'#3a5a24'}],
+  raptor:[{n:'Velociraptor'},{n:'Blue Raptor',body:'#7a8aa0',belly:'#c9d4e0',stripes:'#2a4a7a',scales:'#4a5a7a'},{n:'Green Raptor',body:'#5a8a3a',belly:'#c9d898',stripes:'#2e5a1a'},{n:'Feathered Raptor',body:'#a8744a',fluffy:true}],
+  triceratops:[{n:'Triceratops'},{n:'Brown Triceratops',body:'#8a6a48',belly:'#c9b090',frill:'#e0a03a'},{n:'Green Triceratops',body:'#5a8a4a',belly:'#b8d098',frill:'#3a8aff'}],
+  stegosaurus:[{n:'Stegosaurus'},{n:'Blue Stegosaurus',body:'#4a7a9a',belly:'#a8c8d8',plates:'#ffd23f'},{n:'Brown Stegosaurus',body:'#8a6a48',belly:'#c9b090',plates:'#c9402a'}],
+  mammoth:[{n:'Woolly Mammoth'},{n:'Dark Mammoth',body:'#3a2a1e',belly:'#4a3828'},{n:'Ginger Mammoth',body:'#a8643a',belly:'#b8744a'}],
+};
+function pickBreed(kind){const L=BREEDS[kind];if(!L)return null;return L[(Math.random()*L.length)|0]}
+function breedDef(kind,br){
+  const base=ANIMALS[kind];if(!br)return base;
+  const d=Object.assign({},base);for(const k in br){if(k==='sm'||k==='legs')continue;d[k]=br[k]}
+  if(br.body&&!br.dark)d.dark=shade(br.body,-.28);
+  if(br.body&&!('tail' in br)&&base.tail===base.body)d.tail=br.body;
+  if(br.sm)d.s=base.s*br.sm;if(br.legs)d.ll=base.ll*br.legs;
+  d.n=br.n;d.breed=br.n;return d;
+}
+{const _ma=makeAnimal;makeAnimal=function(kind,x,y,f,opts){
+  if(kind==='vex'||!BREEDS[kind]||(opts&&opts.noBreed))return _ma(kind,x,y,f);
+  const br=opts&&opts.breed||pickBreed(kind),save=ANIMALS[kind];
+  ANIMALS[kind]=breedDef(kind,br);try{const b=_ma(kind,x,y,f);b.breedObj=br;return b}finally{ANIMALS[kind]=save}
+}}
 
 /* =================== UNDO =================== */
 const undoStack=[];
