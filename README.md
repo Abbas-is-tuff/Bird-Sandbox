@@ -1,3 +1,5 @@
+![Bird Sandbox](logo/banner.jpg)
+
 # 🐦 Bird Sandbox
 
 A ragdoll physics sandbox (like Melon Sandbox / People Playground) starring my pet birds — Cookie, Lightning, Snowflake, Mini Snowflake, Salman, Lemon, Jafar, Abbas, Mango, Silver, Pikachu, Aziz, Coco, Orange — and my cat Vex.
