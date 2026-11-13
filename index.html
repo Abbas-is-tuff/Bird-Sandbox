@@ -835,7 +835,8 @@ function birdAI(b,dt){
   const walking=b.act==='walk'&&grounded;
   const tinyK=s<.8?Math.min(2.2,.8/Math.max(s,.2)):1; // small birds take quicker little steps
   if(walking)b.wph+=dt*.32*tinyK;
-  const st1=walking?Math.sin(b.wph):0,st2=walking?Math.sin(b.wph+Math.PI):0;
+  const SL=Math.max(1,Math.pow(LL,.85))*(s>1.25?1+(s-1.25)*.35:1); // longer legs = longer strides
+  const st1=walking?Math.sin(b.wph)*SL:0,st2=walking?Math.sin(b.wph+Math.PI)*SL:0;
   if(att.leg1){addVel(K1,(L.x-2*s*f+st1*3*s-K1.x)*k*.5,(L.y-uy*7*s*LL-K1.y)*k*.5);addVel(F1,(L.x-3*s*f+st1*6*s-F1.x)*k*.6,(L.y-uy*(14*LL-Math.max(0,Math.cos(b.wph))*4*(walking?1:0))*s-F1.y)*k*.6)}
   if(att.leg2){
     if(b.act==='scratch'){addVel(F2,(H.x-f*2*s-F2.x)*k*.8,(H.y-uy*3*s+Math.sin(simTime*30)*2*s-F2.y)*k*.8)}
@@ -845,14 +846,17 @@ function birdAI(b,dt){
   // stand tall: hold the hips up over the feet (matters most for long legs)
   if(grounded&&upright&&legs===2&&(F1.touch||F2.touch)&&!(D0.oneLeg&&!walking)){
     const fx2=(F1.x+F2.x)/2,fy2=Math.max(F1.y*-uy,F2.y*-uy)*-uy,want=fy2+uy*(b.l1J.len+Math.hypot(K1.x-F1.x,K1.y-F1.y))*.9;
-    addVel(L,(fx2-L.x)*k*.5,(want-L.y)*k*.8);
+    const gk=s>1.25?Math.min(1.7,1+(s-1.25)*.9):1; // big birds need stronger legs
+    addVel(L,(fx2-L.x)*k*.5*gk,(want-L.y)*k*.8*gk);
+    if(gk>1&&(want-L.y)*uy>0){const sag=Math.min(1,Math.abs(want-L.y)/(20*s));for(const p of [U,L,H])addVel(p,0,-G*.3*sag*(gk-1)*dt)}
   } else if(grounded&&upright&&D0.oneLeg&&F1.touch){
     const want=F1.y+uy*(b.l1J.len+Math.hypot(K1.x-F1.x,K1.y-F1.y))*.9;addVel(L,(F1.x-L.x)*k*.6,(want-L.y)*k*.8);
   }
   if(att.wing){
     const spread=b.act==='fly'&&b.glide;
-    addVel(E,(U.x-(spread?4:8)*s*f-E.x)*k*.6,(U.y-uy*(spread?-8:6)*s-E.y)*k*.6);
-    addVel(Wt,(U.x-(spread?18:13)*s*f-Wt.x)*k*.6,(U.y-uy*(spread?-6:15)*s-Wt.y)*k*.6);
+    const wf=Math.min(1,D0.wl||1);
+    addVel(E,(U.x-(spread?4:8)*s*wf*f-E.x)*k*.6,(U.y-uy*(spread?-8:6)*s*wf-E.y)*k*.6);
+    addVel(Wt,(U.x-(spread?18:13)*s*wf*f-Wt.x)*k*.6,(U.y-uy*(spread?-6:15)*s*wf-Wt.y)*k*.6);
   }
   if(walking){
     const[vx]=vel(U);const ws=1.4*(s<.8?Math.max(s,.95):s);for(const p of [U,L,H,Bk])addVel(p,(f*ws*(D0.waddle?.7:1)*(D0.run||1)-vx)*.3*dt,0);
