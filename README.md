@@ -10,6 +10,9 @@ Open `index.html` in a browser, or turn on **GitHub Pages** (Settings → Pages 
 
 On iPad: open it in Safari → Share → **Add to Home Screen** to play full screen like an app.
 
+## Play offline
+Open the GitHub Pages link once with internet, then in Safari tap Share → **Add to Home Screen**. The game saves itself on your iPad and works with no internet. It updates itself whenever you open it while online.
+
 ## What's inside
 - 10 maps: Meadow, Beach, Snowy Mountains, Desert, Jungle, Farm, Savanna, City Park, the Moon and an Empty world
 - 60+ birds and 35+ animals with ragdoll physics — limbs can snap off, they catch fire, swim, fly and fight back
