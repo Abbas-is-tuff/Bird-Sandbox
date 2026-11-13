@@ -622,6 +622,7 @@ function step(dt,sub){
       const p=d.p;if(p.pinned){p.x=d.x;p.y=d.y;p.px=p.x;p.py=p.y;if(p.rx!==undefined){p.rx=p.x;p.ry=p.y}}
       else{p.x+=(d.x-p.x)*.45;p.y+=(d.y-p.y)*.45}
     }
+    spinHoldPos();
     for(let i=0;i<pairs.length;i+=2){
       const a=pairs[i],b=pairs[i+1],dx=b.x-a.x,dy=b.y-a.y,mr=a.r+b.r,d2=dx*dx+dy*dy;
       if(d2>=mr*mr||d2<1e-9)continue;
@@ -3518,17 +3519,16 @@ function zoomAt(sx,sy,k){const wx=sx/cam.z+cam.x,wy=sy/cam.z+cam.y;cam.z=clamp(c
 function resetView(){cam={x:0,y:0,z:1};camFollow=null;updView();toast('🏠 Back to the start')}
 // ---- touch gestures: 2 fingers = pinch-zoom & pan, 1 finger on empty space (Grab) = pan ----
 const touches=new Map(),ignoreIds=new Set();let pinch=null,panDrag=null,spinHold=null;
-// ---- two-finger spin: drag with one finger, hold a second finger to spin it (left side = counter-clockwise) ----
-function spinStep(){
+// ---- two-finger lock: drag with one finger, hold a 2nd finger to freeze its rotation until you let go ----
+function lockOffsets(b,o){const out=[];const g=[b];if(b.imp)g.push(b.imp);for(const x of bodies)if(x.imp===b)g.push(x);
+  for(const q of g)for(const p of q.ps)if(p!==o&&!p.pinned)out.push([p,p.x-o.x,p.y-o.y]);return out}
+function spinStep(){ // start of each sub-step: everything moves together with the grabbed point (no turning)
   if(!spinHold)return;const d=drags.get(spinHold.dragId);if(!d||d.p.body.dead){spinHold=null;return}
-  spinHold.w=Math.min(1,spinHold.w+.03*DT);
-  const b=d.p.body,o=d.p,heavy=b.type==='bird'||b.type==='animal'?.55:1;
-  const w=spinHold.dir*.32*heavy*spinHold.w*DT; // radians per sub-step
-  const ox=o.x-o.px,oy=o.y-o.py;
-  const group=[b];if(b.imp)group.push(b.imp);
-  for(const g of group)for(const p of g.ps){if(p===o||p.pinned)continue;const rx=p.x-o.x,ry=p.y-o.y;
-    const vx=ox-ry*w,vy=oy+rx*w;p.px+=((p.x-vx)-p.px)*.5;p.py+=((p.y-vy)-p.py)*.5}
-  if(frameNo%12===0&&b.type==='sword')swish(o.x,SWORDS[b.kind]);
+  const o=d.p,vx=o.x-o.px,vy=o.y-o.py;for(const [p] of spinHold.off){p.px=p.x-vx;p.py=p.y-vy}
+}
+function spinHoldPos(){ // after the drag pull: snap back to the frozen shape
+  if(!spinHold)return;const d=drags.get(spinHold.dragId);if(!d)return;const o=d.p;
+  for(const [p,rx,ry] of spinHold.off){p.x=o.x+rx;p.y=o.y+ry}
 }
 
 function gestureDown(e){
@@ -3536,8 +3536,8 @@ function gestureDown(e){
   if(touches.size>=2&&!spinHold&&touches.size===2){
     for(const [id,d] of drags){if(id===e.pointerId||d.sling||d.p.pinned||d.p.body.type==='branch')continue;
       const t=touches.get(id);if(!t)continue;
-      spinHold={pid:e.pointerId,dragId:id,dir:e.clientX>=t.x?1:-1,w:0};ignoreIds.add(e.pointerId);
-      d.p.body.spinT=frameNo;tone('triangle',500,900,.15,.03,null,d.p.x);return true}
+      spinHold={pid:e.pointerId,dragId:id,off:lockOffsets(d.p.body,d.p)};ignoreIds.add(e.pointerId);
+      tone('triangle',900,700,.08,.03,null,d.p.x);return true}
   }
   if(spinHold&&touches.size>=2){ignoreIds.add(e.pointerId);return true}
   if(touches.size>=2){
@@ -3725,7 +3725,7 @@ const SWORDS={
   toy:{n:'Toy sword',ic:'🪵',len:6,blade:'#c98a42',edge:'#e0a860',guard:'#8a5a22',grip:'#6b4423',toy:true,cut:99,dmg:0},
   giant:{n:'Giant sword',ic:'🗡️',len:12,blade:'#c8ced6',edge:'#ffffff',guard:'#8a1a1a',grip:'#3a1a0a',cut:7,dmg:4,heavy:true},
 };
-const SWORD_ITEMS=Object.entries(SWORDS).map(([k,v])=>({id:'sword:'+k,ic:v.ic,n:v.n,h:'<b>'+v.n+'</b> — grab the handle and swing it'+(v.toy?' (it just bonks, no damage)':'')+'. 🌀 Hold a 2nd finger while dragging to SPIN it, then let go to throw — point-first sticks in things! Drop it next to a bird or animal and they pick it up. Use pulls it out / makes them drop it'}));
+const SWORD_ITEMS=Object.entries(SWORDS).map(([k,v])=>({id:'sword:'+k,ic:v.ic,n:v.n,h:'<b>'+v.n+'</b> — grab the handle and swing it'+(v.toy?' (it just bonks, no damage)':'')+'. 🔒 Hold a 2nd finger while dragging to lock its angle, then throw it point-first and it sticks in things! Drop it next to a bird or animal and they pick it up. Use pulls it out / makes them drop it'}));
 function makeSword(kind,x,y){
   const S=SWORDS[kind],b=newBody('sword',{kind,holder:null,dropT:0,swingT:rand(1,3)});const sp=8,r=3.6,dens=S.heavy?4:S.laser?.6:2.2;
   // handle at ps[0..1], guard ps[2], blade ps[3..]
@@ -4043,7 +4043,7 @@ const WORLD=[
   {id:'spikes',ic:'🔺',n:'Spikes',h:'<b>Spikes</b> — deadly if a bird lands on them'},
 ];
 const TOOLS=[
-  {id:'drag',ic:'✋',n:'Grab',h:'<b>Grab</b> and throw — yank hard and wings & legs snap off! 🌀 Hold a 2nd finger to spin what you’re holding'},
+  {id:'drag',ic:'✋',n:'Grab',h:'<b>Grab</b> and throw — yank hard and wings & legs snap off! 🔒 Hold a 2nd finger to lock its angle'},
   {id:'use',ic:'✨',n:'Use',h:'<b>Use</b>: tap cannons, rockets, boats, carts, fans, fireworks, bells, bubble machines, hot air balloons, eggs, birds…'},
   {id:'inspect',ic:'🔍',n:'Inspect',h:'<b>Inspect</b>: tap a bird to see details and <b>rename</b> it'},
   {id:'call',ic:'📣',n:'Whistle',h:'<b>Whistle</b>: tap a spot and all the birds fly to you'},
