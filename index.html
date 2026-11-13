@@ -507,7 +507,7 @@ function buildPairs(){
     for(let ox=-1;ox<=1;ox++)for(let oy=-1;oy<=1;oy++){
       const a=map.get((cx+ox)*100000+cy+oy);if(!a)continue;
       for(const q of a){
-        if(q.i<=p.i||q.body===p.body||(p.pinned&&q.pinned))continue;
+        if(q.i<=p.i||q.body===p.body||(p.pinned&&q.pinned)||q.body.holder===p.body||p.body.holder===q.body)continue;
         const m=p.r+q.r+10,dx=q.x-p.x,dy=q.y-p.y;
         if(dx*dx+dy*dy<m*m)pairs.push(p,q);
       }
@@ -2246,11 +2246,11 @@ const NEW_ITEMS=[
   {id:'hotair',ic:'🎈',n:'Hot air balloon',h:'<b>Hot air balloon</b> — tap the basket to fire the burner'},
   {id:'chimes',ic:'🎐',n:'Wind chimes',h:'<b>Wind chimes</b> — ring in the wind'},
 ];
-const TAPUSE=new Set(['bucket','cannon','rocket','firework','cart','boat','fan','bell','bubbler','hab','habenv','bomb','campfire']);
+const TAPUSE=new Set(['sword','bucket','cannon','rocket','firework','cart','boat','fan','bell','bubbler','hab','habenv','bomb','campfire']);
 const NOSAVE=new Set(['limb','bridge','chain','chime','kite','hab','habenv','worm','tirex']);
 const SPHERES=new Set(['ball','melon','bomb','pumpkin','apple','coconut','bowl','berry']);
 ['barrel','domino','bridge','kite','hab'].forEach(t=>FLAM.add(t));
-['chain','chime','bowl'].forEach(t=>METAL.add(t));
+['chain','chime','bowl','sword'].forEach(t=>METAL.add(t));
 
 /* ---- plants ---- */
 function makePlant(kind,x,base,o={}){
@@ -2291,6 +2291,7 @@ function deletePlantAt(x,y){
 function natureSpawn(id,x,y){
   {const r=critterSpawn(id,x,y);if(r!==false)return r}
   {const r=moreSpawn(id,x,y);if(r!==false)return r}
+  {const r=swordSpawn(id,x,y);if(r!==false)return r}
   if(id.startsWith('blkraw:')){const k=id.slice(7);return MATS[k]?add(makeBlock(k,x,y)):undefined}
   const S2=(t,r,o,e)=>add(single(t,x,y,r,o,e));
   switch(id){
@@ -2337,6 +2338,7 @@ function natureSpawn(id,x,y){
 function natureActivate(b,x,y){
   switch(b.type){
     case 'bucket':splashBucket(b);return true;
+    case 'sword':if(b.holder){const h=b.holder;b.holder=null;b.dropT=3;toast((h.name||h.def.name||h.def.n)+' dropped the sword')}else{const t=b.ps[b.ps.length-1];for(let i=3;i<b.ps.length;i++)addVel(b.ps[i],0,-(i-2)*1.8);swish(t.x,SWORDS[b.kind])}return true;
     case 'animal':if(b.alive){animalSound(b);animalJump(b,0,4);if(b.def.cat)purr(b.C.x);fx.push({t:'heart',x:b.Hd.x,y:b.Hd.y-20,vy:-1,life:1});b.stun=0}return true;
     case 'bubbler':b.on=!b.on;toast(b.on?'🫧 Bubbles on':'Bubbles off');tone('square',500,300,.08,.04,null,x);return true;
     case 'hab':b.burner=!b.burner;toast(b.burner?'🔥 Burner on — up we go!':'Burner off');noise(.4,.12,700,'lowpass',x);return true;
@@ -2386,7 +2388,7 @@ function catchFish(b,pd,f){
 }
 /* ---- per-step updates ---- */
 function natureEarly(dt){
-  const sec=dt/60;updateCritters(dt);animalFamilies(dt);updateBuckets(dt);updateMapExtras(dt);
+  const sec=dt/60;updateCritters(dt);animalFamilies(dt);swordUpdate(dt);updateBuckets(dt);updateMapExtras(dt);
   // plants make food
   for(const pl of [...plants]){
     pl.t-=sec;
@@ -2520,6 +2522,7 @@ function drawNature(c,b){
   switch(b.type){
     case 'animal':drawAnimal(c,b);return true;
     case 'block':drawBlock(c,b);return true;
+    case 'sword':drawSword(c,b);return true;
     case 'bucket':drawBucket(c,b);return true;
     case 'skate':drawSkate(c,b);return true;
     case 'soccer':case 'bball':drawSportsBall(c,b);return true;
@@ -3689,6 +3692,94 @@ function doSpawn(ps,withDrag){
   if(withDrag&&b&&b.ps&&!['balloon','bell','swing','campfire','pinata'].includes(b.type))drags.set(ps.pid,{p:b.type==='bird'?b.U:b.type==='animal'?b.C:b.ps[0],x:ps.wx,y:ps.wy});
 }
 function pendingCheck(){if(pendingSpawn&&performance.now()-pendingSpawn.t0>230)doSpawn(pendingSpawn,true)}
+/* =================== SWORDS =================== */
+const SWORDS={
+  sword:{n:'Sword',ic:'🗡️',len:7,blade:'#d8dde3',edge:'#ffffff',guard:'#d4a017',grip:'#5a2e12',cut:9,dmg:3},
+  katana:{n:'Katana',ic:'⚔️',len:8,blade:'#e8ecf0',edge:'#ffffff',guard:'#2a2a2a',grip:'#1a1a1a',wrap:'#c1121f',curve:1,cut:8,dmg:3.4},
+  saber:{n:'Laser sword',ic:'🔆',len:8,blade:'#7df9ff',glow:'#00d9ff',guard:'#9aa0a8',grip:'#3a3f45',laser:true,cut:6,dmg:4},
+  redsaber:{n:'Red laser sword',ic:'🔴',len:8,blade:'#ff8a8a',glow:'#ff1a1a',guard:'#2a2a2a',grip:'#1a1a1a',laser:true,cut:6,dmg:4},
+  toy:{n:'Toy sword',ic:'🪵',len:6,blade:'#c98a42',edge:'#e0a860',guard:'#8a5a22',grip:'#6b4423',toy:true,cut:99,dmg:0},
+  giant:{n:'Giant sword',ic:'🗡️',len:12,blade:'#c8ced6',edge:'#ffffff',guard:'#8a1a1a',grip:'#3a1a0a',cut:7,dmg:4,heavy:true},
+};
+const SWORD_ITEMS=Object.entries(SWORDS).map(([k,v])=>({id:'sword:'+k,ic:v.ic,n:v.n,h:'<b>'+v.n+'</b> — grab the handle and swing it'+(v.toy?' (it just bonks, no damage)':'')+'. Drop it next to a bird or animal and they pick it up and swing it! ✨ Use makes them drop it'}));
+function makeSword(kind,x,y){
+  const S=SWORDS[kind],b=newBody('sword',{kind,holder:null,dropT:0,swingT:rand(1,3)});const sp=8,r=3.6,dens=S.heavy?4:S.laser?.6:2.2;
+  // handle at ps[0..1], guard ps[2], blade ps[3..]
+  const n=S.len+3;for(let i=0;i<n;i++){const p=new P(x-((n-1)/2)*sp+i*sp,y-(S.curve?Math.pow(i/n,2)*8:0),i===2?4.5:r,b,{im:S.heavy?.25:.9,fric:S.laser?.05:.3,dens,rest:.2});b.ps.push(p)}
+  for(let i=0;i<n;i++)for(let j=i+1;j<n;j++)stick(b,b.ps[i],b.ps[j]);
+  return b;
+}
+function swordSpawn(id,x,y){if(!id.startsWith('sword:'))return false;const k=id.slice(6);if(!SWORDS[k])return undefined;const b=add(makeSword(k,x,y));tone('triangle',2400,2000,.25,.03,null,x);return b}
+function swordHand(h){if(h.type==='bird')return h.Bk;if(h.type==='animal')return h.Hd;return null}
+function swordUpdate(dt){
+  const sec=dt/60;
+  for(const sw of bodies){if(sw.type!=='sword'||sw.dead)continue;const S=SWORDS[sw.kind],ps=sw.ps,grip=ps[0],tip=ps[ps.length-1];
+    sw.dropT=Math.max(0,sw.dropT-sec);
+    // being held by a bird/animal
+    const h=sw.holder;
+    if(h&&(h.dead||!h.alive||!bodies.includes(h)||sw.held||h.frozenT>0)){sw.holder=null;sw.dropT=2}
+    else if(h){const hp=swordHand(h);const f=h.f||1;
+      // handle snaps to the beak / mouth, blade points forward and a bit up
+      const gx=hp.x+f*2,gy=hp.y+2;for(const p of [ps[0],ps[1]]){p.x+=(gx-p.x)*.6;p.y+=(gy-p.y)*.6}
+      const ang=Math.atan2(tip.y-grip.y,tip.x-grip.x),want=f>0?-.5:Math.PI+.5;let da=want-ang;while(da>Math.PI)da-=TAU;while(da<-Math.PI)da+=TAU;
+      const L=Math.hypot(tip.x-grip.x,tip.y-grip.y)||1,nx=-(tip.y-grip.y)/L,ny=(tip.x-grip.x)/L;
+      for(let i=3;i<ps.length;i++){const k=(i/ps.length)*da*.06*dt;addVel(ps[i],nx*k*L*.1,ny*k*L*.1)}
+      // swing!
+      sw.swingT-=sec;
+      if(sw.swingT<=0&&h.stun<=0){sw.swingT=rand(1.2,3.2);const dir=Math.random()<.5?1:-1;for(let i=3;i<ps.length;i++)addVel(ps[i],nx*dir*(i-2)*1.6,ny*dir*(i-2)*1.6);swish(grip.x,S)}
+      for(const p of h.ps)addVel(p,0,-G*.08*dt*(S.heavy?1:.3)); // light enough to carry
+    }
+    else if(sw.dropT<=0&&!sw.held){
+      // pick it up if it lands near a beak or mouth
+      for(const o of bodies){if((o.type!=='bird'&&o.type!=='animal')||!o.alive||o.dragT||o.stun>0)continue;const hp=swordHand(o);if(!hp)continue;
+        if(Math.hypot(hp.x-grip.x,hp.y-grip.y)<30&&Math.hypot(grip.x-grip.px,grip.y-grip.py)<8*dt){if(bodies.some(q=>q.type==='sword'&&q.holder===o))continue;sw.holder=o;sw.swingT=rand(.5,1.5);
+          fx.push({t:'text',x:hp.x,y:hp.y-30,vy:-.7,life:1.2,txt:(o.name||(o.def.name||o.def.n))+' grabbed the '+S.n.toLowerCase()+'! ⚔️'});tone('triangle',1800,2600,.2,.04,null,hp.x);break}}
+    }
+    // blade hits
+    const fast=Math.hypot(tip.x-tip.px,tip.y-tip.py)/DT;
+    if(S.laser&&fast>5&&okSnd('hum'+sw.born,160))tone('sawtooth',90+fast*6,70+fast*5,.18,.02,200,tip.x);
+    if(frameNo-sw.born>40)for(let i=3;i<ps.length;i++){const bp=ps[i],bvx=(bp.x-bp.px)/DT,bvy=(bp.y-bp.py)/DT;
+      for(const o of bodies){if(o===sw||o===sw.holder||(o.type!=='bird'&&o.type!=='animal'))continue;
+        for(const q of o.ps){const dx=q.x-bp.x,dy=q.y-bp.y,rr=q.r+bp.r+3;if(dx*dx+dy*dy>rr*rr)continue;
+          const rel=Math.hypot(bvx-(q.x-q.px)/DT,bvy-(q.y-q.py)/DT);if(rel<S.cut)continue;
+          if(simTime-(o.swordT||0)<.25)continue;o.swordT=simTime;
+          if(S.toy){if(okSnd('bonk',80))tone('sine',300,180,.1,.06,null,q.x);fx.push({t:'star',x:q.x,y:q.y-10,vx:rand(-1,1),vy:-2,life:.6});if(o.type==='bird'&&o.alive)o.stun=Math.max(o.stun,.6);continue}
+          const dmg=(rel-S.cut+2)*S.dmg*(h?.6:1);
+          if(o.type==='bird'){if(o.alive)hurt(o,dmg,true);feathers(o,3,q);
+            const part=o.part.get(q);if(rel>S.cut+4){if(part==='wing'&&o.att.wing)breakLimb(o,'wing');else if(part==='leg1'&&o.att.leg1)breakLimb(o,'leg1');else if(part==='leg2'&&o.att.leg2)breakLimb(o,'leg2')}}
+          else{if(o.alive)hurtAnimal(o,dmg);const pt=o.part.get(q);if(rel>S.cut+4){if(pt==='legF')breakAnimalLimb(o,'legF');else if(pt==='legB')breakAnimalLimb(o,'legB');else if(pt==='tail')breakAnimalLimb(o,'tail')}}
+          addVel(q,bvx*.15,bvy*.15);clang(q.x,S);
+          for(let k=0;k<5;k++)fx.push({t:'spark',x:q.x,y:q.y,vx:rand(-3,3),vy:rand(-3,1),life:.5,col:S.laser?S.glow:'#fff6c0'});
+          break}}}
+  }
+}
+function swish(x,S){if(!okSnd('swish',120))return;if(S.laser){tone('sawtooth',160,320,.25,.04,600,x)}else noise(.18,.12,2400,'bandpass',x,4)}
+function clang(x,S){if(!okSnd('clang',70))return;if(S.laser){tone('sawtooth',600,200,.2,.05,900,x);noise(.15,.05,3000,'highpass',x)}else{tone('triangle',2600,2400,.25,.05,null,x);noise(.08,.08,4000,'highpass',x)}}
+function drawSword(c,b){
+  const S=SWORDS[b.kind],ps=b.ps,n=ps.length,g0=ps[0],g1=ps[1],gd=ps[2],tip=ps[n-1];
+  const dx=tip.x-g0.x,dy=tip.y-g0.y,L=Math.hypot(dx,dy)||1,ux=dx/L,uy=dy/L,nx=-uy,ny=ux;
+  // grip
+  c.lineCap='round';c.strokeStyle=S.grip;c.lineWidth=6;c.beginPath();c.moveTo(g0.x-ux*4,g0.y-uy*4);c.lineTo(gd.x,gd.y);c.stroke();
+  if(S.wrap){c.strokeStyle=S.wrap;c.lineWidth=2;c.beginPath();for(let t=.15;t<.95;t+=.2){const x=lerp(g0.x,gd.x,t),y=lerp(g0.y,gd.y,t);c.moveTo(x+nx*3,y+ny*3);c.lineTo(x-nx*3+ux*3,y-ny*3+uy*3)}c.stroke()}
+  c.fillStyle=S.guard;circle(c,g0.x-ux*5,g0.y-uy*5,3.5);
+  // blade
+  if(S.laser){
+    c.save();c.globalCompositeOperation='lighter';c.strokeStyle=S.glow;c.globalAlpha=.35;c.lineWidth=16;c.beginPath();c.moveTo(gd.x,gd.y);for(let i=3;i<n;i++)c.lineTo(ps[i].x,ps[i].y);c.lineTo(tip.x+ux*4,tip.y+uy*4);c.stroke();
+    c.globalAlpha=.7;c.lineWidth=9;c.stroke();c.restore();c.strokeStyle='#ffffff';c.lineWidth=4;c.beginPath();c.moveTo(gd.x,gd.y);for(let i=3;i<n;i++)c.lineTo(ps[i].x,ps[i].y);c.lineTo(tip.x+ux*4,tip.y+uy*4);c.stroke();
+  } else {
+    const w=S.heavy?7:4.5;c.fillStyle=S.blade;c.beginPath();c.moveTo(gd.x+nx*w,gd.y+ny*w);
+    for(let i=3;i<n-1;i++)c.lineTo(ps[i].x+nx*w*(S.curve?.9:1),ps[i].y+ny*w*(S.curve?.9:1));
+    c.lineTo(tip.x+ux*(S.toy?2:9),tip.y+uy*(S.toy?2:9));
+    for(let i=n-2;i>=3;i--)c.lineTo(ps[i].x-nx*w,ps[i].y-ny*w);c.lineTo(gd.x-nx*w,gd.y-ny*w);c.closePath();c.fill();
+    c.strokeStyle='rgba(0,0,0,.35)';c.lineWidth=1;c.stroke();
+    if(!S.toy){c.strokeStyle=S.edge;c.globalAlpha=.8;c.lineWidth=1.2;c.beginPath();c.moveTo(gd.x+nx*1,gd.y+ny*1);c.lineTo(tip.x,tip.y);c.stroke();c.globalAlpha=1;
+      const sh=(Math.sin(simTime*2+b.born)+1)/2;c.fillStyle=`rgba(255,255,255,${.5*sh})`;const sx=lerp(gd.x,tip.x,sh),sy=lerp(gd.y,tip.y,sh);circle(c,sx,sy,2.2)}
+  }
+  // crossguard
+  c.strokeStyle=S.guard;c.lineWidth=5;c.beginPath();c.moveTo(gd.x+nx*(S.heavy?13:10),gd.y+ny*(S.heavy?13:10));c.lineTo(gd.x-nx*(S.heavy?13:10),gd.y-ny*(S.heavy?13:10));c.stroke();
+  if(b.holder){c.font='12px system-ui';c.textAlign='center';c.fillText('⚔️',g0.x,g0.y-14)}
+}
+
 /* =================== UNDO =================== */
 const undoStack=[];
 function pushUndo(){
@@ -3930,7 +4021,7 @@ const POWERS=[
   {id:'quake',ic:'🫨',n:'Earthquake',h:'Tap to shake the ground — <b>earthquake</b>!'},
   {id:'portal',ic:'🌀',n:'Portals',h:'<b>Portals</b>: tap two spots — things going in one come out the other'},
 ];
-ITEMS.push(...NEW_ITEMS,...MORE_ITEMS);TOOLS.push(...CAM_TOOLS);
+ITEMS.push(...SWORD_ITEMS,...NEW_ITEMS,...MORE_ITEMS);TOOLS.push(...CAM_TOOLS);
 let tab='birds';
 const itemsEl=document.getElementById('items'),hintEl=document.getElementById('hint'),setEl=document.getElementById('settings');
 function birdIcon(def){
@@ -3999,7 +4090,7 @@ function saveWorld(){
   const idx=d=>BIRDS.indexOf(d);
   const data={v:1,tod,S:{...S},walls:walls.filter(w=>!w.trunk&&!w.house&&!w.feeder&&!w.lamp).map(w=>({...w})),lamps:lamps.map(l=>({x:l.x,base:l.base})),sprinklers:sprinklers.map(q=>({x:q.x,base:q.base})),slings:slings.map(q=>({x:q.x,base:q.base})),portals:portals.map(pr=>({a:pr.a,b:pr.b})),mirrors:mirrors.map(m=>({x:m.x,base:m.base})),feeders:feeders.map(f=>({x:f.x,base:f.base})),ponds:ponds.map(p=>({x:p.x,w:p.w})),trees:trees.map(t=>({x:t.x,base:t.base})),houses:houses.map(h=>({x:h.x,base:h.base})),
     bodies:bodies.concat(houses.flatMap(h=>h.occ)).filter(b=>!['branch','anchor','piece','shard','chunk','seed','bell','swing','meteor','pinata'].includes(b.type)).map(b=>{const c=centroid(b);
-      const id=b.type==='egg'?'egg:'+b.defIdx:b.type==='bird'?'bird:'+idx(b.def):b.type==='furn'?b.kind:b.type==='plank'&&b.cols<8?null:b.type==='seesaw'?'seesaw':b.type==='animal'?'animal:'+b.kind:b.type==='block'?'blkraw:'+b.mat:b.type;
+      const id=b.type==='egg'?'egg:'+b.defIdx:b.type==='bird'?'bird:'+idx(b.def):b.type==='furn'?b.kind:b.type==='plank'&&b.cols<8?null:b.type==='seesaw'?'seesaw':b.type==='animal'?'animal:'+b.kind:b.type==='block'?'blkraw:'+b.mat:b.type==='sword'?'sword:'+b.kind:b.type;
       return id?{id,x:c.x,y:c.y,sc:b.scale||1,dead:b.type==='bird'&&!b.alive,f:b.f,name:b.name,hat:b.hat,paint:b.paint}:null}).filter(Boolean)};
   natureSave(data);try{localStorage.setItem('birdSandboxWorld',JSON.stringify(data));$('saveMsg').textContent='Saved ✓ ('+data.bodies.length+' things)';toast('World saved 💾')}catch(e){$('saveMsg').textContent='Could not save on this device';}
 }
