@@ -111,6 +111,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#87ceeb;touch-action:n
     <button class="tab" data-tab="build">🏗️ Build</button>
     <button class="tab" data-tab="weapons">🔫 Weapons</button>
     <button class="tab" data-tab="bombs">💣 Bombs</button>
+    <button class="tab" data-tab="cars">🚗 Cars</button>
     <button class="tab" data-tab="tools">🛠️ Tools</button>
     <button class="tab" data-tab="powers">⚡ Powers</button>
     <input id="search" placeholder="🔍 Search" autocomplete="off">
@@ -550,6 +551,7 @@ function statics(p){
       if(pd.ice>.6&&p.y-r<iy+6){p.y=iy+6+r;contact(p,0,1)} // trapped under the ice
     }
   }
+  if(terrainOn&&!pd)terrainContact(p);
   if(p.y+r>floor){p.y=floor-r;contact(p,0,-1,fw)}
   if(p.y-r<0&&(G<0||p.buoy)){p.y=r;contact(p,0,1)}
   for(const w of walls){
@@ -766,7 +768,7 @@ function birdCall(b,reply){
   b.callVis=.4;
   if(!reply)for(const o of bodies)if(o!==b&&o.type==='bird'&&o.alive&&!o.sleep&&o.replyT<=0&&Math.hypot(o.U.x-b.U.x,o.U.y-b.U.y)<380&&Math.random()<.55){o.replyT=rand(.35,1.1);o.f=b.U.x>o.U.x?1:-1}
 }
-function goalFly(b,x,y,kind,extra){b.goal=Object.assign({x,y,kind},extra);b.wp=null;b.flyT=6;b.act='fly';b.f=x>b.U.x?1:-1;b.getUpT=0}
+function goalFly(b,x,y,kind,extra){if(terrainOn)y=Math.min(y,gAt(x)-30);b.goal=Object.assign({x,y,kind},extra);b.wp=null;b.flyT=6;b.act='fly';b.f=x>b.U.x?1:-1;b.getUpT=0}
 function birdAI(b,dt){
   const sec=dt/60;
   b.stun=Math.max(0,b.stun-sec);b.hurtT-=sec;b.callVis=Math.max(0,(b.callVis||0)-sec);
@@ -1586,6 +1588,7 @@ function render(){
   // distant hills
   BX0=cam.x*.35;ctx.save();ctx.translate(-BX0,(groundY-cam.y)*cam.z-groundY);drawBackdrop(ctx,bot);ctx.restore();
   ctx.save();ctx.translate(sx,sy);ctx.scale(cam.z,cam.z);ctx.translate(-cam.x,-cam.y);
+  drawMountain(ctx);drawMtnFlag(ctx);
   // birdhouses
   for(const h of houses){
     ctx.fillStyle=mix('#2a1a0c','#7a5230',light);ctx.fillRect(h.x-4,h.y+22,8,(h.base??groundY)-h.y-22);
@@ -2264,11 +2267,11 @@ const NEW_ITEMS=[
   {id:'hotair',ic:'🎈',n:'Hot air balloon',h:'<b>Hot air balloon</b> — tap the basket to fire the burner'},
   {id:'chimes',ic:'🎐',n:'Wind chimes',h:'<b>Wind chimes</b> — ring in the wind'},
 ];
-const TAPUSE=new Set(['gun','xpl','sword','bucket','cannon','rocket','firework','cart','boat','fan','bell','bubbler','hab','habenv','bomb','campfire']);
+const TAPUSE=new Set(['car','gun','xpl','sword','bucket','cannon','rocket','firework','cart','boat','fan','bell','bubbler','hab','habenv','bomb','campfire']);
 const NOSAVE=new Set(['limb','bridge','chain','chime','kite','hab','habenv','worm','tirex']);
 const SPHERES=new Set(['ball','melon','bomb','pumpkin','apple','coconut','bowl','berry']);
 ['barrel','domino','bridge','kite','hab'].forEach(t=>FLAM.add(t));
-['chain','chime','bowl','sword','gun'].forEach(t=>METAL.add(t));
+['chain','chime','bowl','sword','gun','car'].forEach(t=>METAL.add(t));
 
 /* ---- plants ---- */
 function makePlant(kind,x,base,o={}){
@@ -2311,6 +2314,7 @@ function natureSpawn(id,x,y){
   {const r=moreSpawn(id,x,y);if(r!==false)return r}
   {const r=swordSpawn(id,x,y);if(r!==false)return r}
   {const r=gunSpawn(id,x,y);if(r!==false)return r}
+  {const r=carSpawn(id,x,y);if(r!==false)return r}
   if(id.startsWith('blkraw:')){const k=id.slice(7);return MATS[k]?add(makeBlock(k,x,y)):undefined}
   const S2=(t,r,o,e)=>add(single(t,x,y,r,o,e));
   switch(id){
@@ -2356,6 +2360,7 @@ function natureSpawn(id,x,y){
 }
 function natureActivate(b,x,y){
   if(gunActivate(b))return true;
+  if(carActivate(b))return true;
   switch(b.type){
     case 'bucket':splashBucket(b);return true;
     case 'sword':if(b.imp){unImpale(b);b.impT=simTime+1;toast('Pulled the sword out');pop(.4,b.ps[b.ps.length-1].x)}else if(b.holder){const h=b.holder;b.holder=null;b.dropT=3;toast((h.name||h.def.name||h.def.n)+' dropped the sword')}else{const t=b.ps[b.ps.length-1];for(let i=3;i<b.ps.length;i++)addVel(b.ps[i],0,-(i-2)*1.8);swish(t.x,SWORDS[b.kind])}return true;
@@ -2408,7 +2413,7 @@ function catchFish(b,pd,f){
 }
 /* ---- per-step updates ---- */
 function natureEarly(dt){
-  const sec=dt/60;updateCritters(dt);animalFamilies(dt);swordUpdate(dt);gunUpdate(dt);updateBuckets(dt);updateMapExtras(dt);
+  const sec=dt/60;updateCritters(dt);animalFamilies(dt);swordUpdate(dt);gunUpdate(dt);carUpdate(dt);updateBuckets(dt);updateMapExtras(dt);
   // plants make food
   for(const pl of [...plants]){
     pl.t-=sec;
@@ -2544,6 +2549,7 @@ function drawNature(c,b){
     case 'block':drawBlock(c,b);return true;
     case 'sword':drawSword(c,b);return true;
     case 'gun':drawGun(c,b);return true;
+    case 'car':drawCar(c,b);return true;
     case 'xpl':drawXpl(c,b);return true;
     case 'bucket':drawBucket(c,b);return true;
     case 'skate':drawSkate(c,b);return true;
@@ -2779,7 +2785,7 @@ function pairResponse(dt){
     a.px+=ix*wa/w;a.py+=iy*wa/w;b.px-=ix*wb/w;b.py-=iy*wb/w;
   }
 }
-const NOREST=new Set(['bird','branch','balloon','kite','hab','habenv','anchor','bell','chime','firework','rocket','cart','boat']);
+const NOREST=new Set(['car','bird','branch','balloon','kite','hab','habenv','anchor','bell','chime','firework','rocket','cart','boat']);
 function restDamp(dt){
   const th=.05*dt;
   for(const b of bodies){
@@ -3523,7 +3529,7 @@ function openMapMenu(first){
 function searchList(q){
   q=q.trim().toLowerCase();if(!q)return null;
   const all=[...BIRDS.map((d,i)=>({id:'bird:'+i,n:d.name,kind:'spawn',icon:icons&&icons[i],h:'Tap to place <b>'+d.name+'</b>'})),
-    ...[...ANIMAL_TAB,...ITEMS,...WEAPONS,...BOMBS_TAB,...PLANTS,...BUILD_TAB,...WORLD.filter(it=>it.id!=='sling')].map(it=>({kind:'spawn',...it})),...[...TOOLS,...POWERS].map(t=>({...t,kind:'tool'}))];
+    ...[...ANIMAL_TAB,...ITEMS,...WEAPONS,...BOMBS_TAB,...CAR_ITEMS,...PLANTS,...BUILD_TAB,...WORLD.filter(it=>it.id!=='sling')].map(it=>({kind:'spawn',...it})),...[...TOOLS,...POWERS].map(t=>({...t,kind:'tool'}))];
   return all.filter(it=>(it.n||'').toLowerCase().includes(q));
 }
 
@@ -3731,7 +3737,7 @@ let pendingSpawn=null;
 function doSpawn(ps,withDrag){
   pendingSpawn=null;pushUndo();const x=ps.x,y=ps.y,id=ps.id;
   if(id==='tree'||id==='house'||id==='lamp'||id==='feeder'||id==='sling'||id==='mirror'||id==='sprinkler'){spawn(id,x,y);return}
-  const b=spawn(id,x,Math.min(y,groundY-20));
+  const b=spawn(id,x,Math.min(y,(terrainOn?gAt(x):groundY)-20));
   if(withDrag&&b&&b.ps&&!['balloon','bell','swing','campfire','pinata'].includes(b.type))drags.set(ps.pid,{p:b.type==='bird'?b.U:b.type==='animal'?b.C:b.ps[0],x:ps.wx,y:ps.wy});
 }
 function pendingCheck(){if(pendingSpawn&&performance.now()-pendingSpawn.t0>230)doSpawn(pendingSpawn,true)}
@@ -3898,6 +3904,7 @@ function rayHit(x,y,ux,uy,R,skip){
     let t0=0,t1=best;for(const [o,u,lo,hi] of [[x,ux,w.x,w.x+w.w],[y,uy,w.y,w.y+w.h]]){if(Math.abs(u)<1e-9){if(o<lo||o>hi){t0=1;t1=0}continue}let a=(lo-o)/u,c=(hi-o)/u;if(a>c)[a,c]=[c,a];t0=Math.max(t0,a);t1=Math.min(t1,c)}
     if(t0<=t1&&t0<best&&t0>0){best=t0;hp=null}}
   if(uy>0){const tg=(groundY-y)/uy;if(tg>0&&tg<best&&!pondAt(x+ux*tg)){best=tg;hp=null}}
+  if(terrainOn)for(let t=6;t<best;t+=6){if(y+uy*t>gAt(x+ux*t)){best=t;hp=null;break}}
   return{t:best,p:hp,x:x+ux*best,y:y+uy*best};
 }
 function bulletHit(g,p,ux,uy,hx,hy){
@@ -4353,6 +4360,206 @@ drawGun=function(c,b){const g=GUNS[b.kind];if(!(g.bow||g.xbow||g.flare||g.longSt
   if(g.auto&&b.firing&&!b.holder){c.fillStyle='#ff3b3b';circle(c,a0.x,a0.y-12,2.5)}
 };
 
+/* =================== MOUNTAIN TERRAIN =================== */
+let terrainOn=false,MTN_X0=0;const MTN_SP=3800,mtnPeaks=new Map();
+function mtnPeak(i){
+  if(mtnPeaks.has(i))return mtnPeaks.get(i);
+  const R=rng(i*7331+17);let pk;
+  if(i===0)pk={x:MTN_X0,h:1150,w:2100,flat:50};
+  else pk={x:MTN_X0+i*MTN_SP+(R()-.5)*500,h:420+R()*620,w:1300+R()*500,flat:R()<.5?30:0};
+  mtnPeaks.set(i,pk);return pk;
+}
+function tH(x){
+  if(!terrainOn)return 0;
+  const i0=Math.round((x-MTN_X0)/MTN_SP);let h=0;
+  for(let i=i0-1;i<=i0+1;i++){const pk=mtnPeak(i),t=Math.abs(x-pk.x)/pk.w;if(t>=1)continue;
+    let v=pk.h*Math.pow(1-t,1.55);
+    v+=Math.sin(x*.006+i)*10*(1-t); // bumpy rocks
+    if(pk.flat)v=Math.min(v,pk.h-pk.flat);
+    if(v>h)h=v}
+  return h;
+}
+function gAt(x){return groundY-tH(x)}
+function terrainContact(p){
+  const h=tH(p.x);if(h<=0)return false;
+  const g=groundY-h,r=p.r;if(p.y+r<g-2)return false;
+  const g1=gAt(p.x-3),g2=gAt(p.x+3),dg=(g2-g1)/6,len=Math.hypot(dg,1),nx=dg/len,ny=-1/len;
+  const d=(g-p.y)/len; // distance above the slope
+  if(d>=r)return false;
+  const k=r-d;p.x+=nx*k;p.y+=ny*k;contact(p,nx,ny);return true;
+}
+function drawMountain(c){
+  if(!terrainOn)return;
+  const x0=Math.floor((VX0-40)/8)*8,x1=VX1+40;
+  c.beginPath();c.moveTo(x0,groundY+4);for(let x=x0;x<=x1;x+=8)c.lineTo(x,gAt(x));c.lineTo(x1,groundY+4);c.closePath();
+  const top=groundY-1200,g=c.createLinearGradient(0,top,0,groundY);
+  g.addColorStop(0,mix('#3a3a44','#9a98a0',light));g.addColorStop(.55,mix('#2e2a26','#7a6a5a',light));g.addColorStop(.85,mix('#1d2a14','#5a7a3a',light));g.addColorStop(1,mix('#1d3d1a','#5fbf4a',light));
+  c.fillStyle=g;c.fill();
+  c.save();c.clip();
+  // rocky streaks
+  c.strokeStyle=mix('rgba(0,0,0,.14)','rgba(60,50,40,.16)',light);c.lineWidth=3;
+  for(let x=Math.floor(x0/90)*90;x<x1;x+=90){const h=tH(x);if(h<80)continue;const y=gAt(x);c.beginPath();c.moveTo(x,y+20);c.lineTo(x+18,y+60+(x%7)*8);c.stroke()}
+  // snow cap
+  c.fillStyle=mix('#9aa6ba','#f6f9ff',light);c.beginPath();c.moveTo(x0,groundY-4000);
+  for(let x=x0;x<=x1;x+=8)c.lineTo(x,groundY-880+Math.sin(x*.05)*18+Math.sin(x*.013)*30);
+  c.lineTo(x1,groundY-4000);c.closePath();c.fill();
+  c.restore();
+  // outline
+  c.strokeStyle=mix('rgba(0,0,0,.35)','rgba(40,30,20,.35)',light);c.lineWidth=2;c.beginPath();for(let x=x0;x<=x1;x+=8){const y=gAt(x);if(x===x0)c.moveTo(x,y);else c.lineTo(x,y)}c.stroke();
+}
+MAPS.mountain={n:'Mountain',ic:'⛰️',d:'A giant mountain to climb — your birds start at the very tip!',hills:'snow',weather:'clear',grav:1,time:11,
+  ground:{earth:['#2d1d10','#7a5230'],grass:['#1d3d1a','#5fbf4a'],grass2:['#173315','#4ea83b']},noTufts:true,scene:'mountain'};
+MAP_LIFE.mountain={b:['Eagle','Hawk','Raven','Kea','Condor',"Falcon"],a:['goat','deer','wolf','bear','moose']};
+{const _pm=populateMap;populateMap=function(id){
+  if(MAP.scene!=='mountain')return _pm(id);
+  const top=mtnPeak(0),R=(a,b)=>a+Math.random()*(b-a);
+  const birdAt=(d,x,f)=>{const b=add(makeBird(d,x,gAt(x)-34*d.s,f||(Math.random()<.5?1:-1)));b.toughT=3;return b};
+  // your birds on the very tip, the rest spread on ledges going down
+  const pets=BIRDS.filter(d=>d.pet&&!d.extra);
+  const ledges=[];
+  for(const [side,hh] of [[-1,.72],[1,.6],[-1,.42],[1,.3],[-1,.16],[1,.08]]){
+    const t=1-Math.pow(hh,1/1.55),x=top.x+side*t*top.w,y=gAt(x);const w=130;
+    const lx=side<0?x-w+10:x-10;walls.push({x:lx,y,w,h:16,ledge:true});ledges.push({x:lx+w/2,y})}
+  pets.forEach((d,i)=>{if(i<3){const x=top.x+(i-1)*22;birdAt(d,x,i%2?-1:1)}else{const L=ledges[(i-3)%ledges.length];const b=add(makeBird(d,L.x+((i-3)>=ledges.length?30:-10),L.y-34*d.s,Math.random()<.5?1:-1));b.toughT=3}});
+  // summit flag
+  walls.push({x:top.x+30,y:gAt(top.x+30)-80,w:5,h:80,pole:true});
+  mtnFlag={x:top.x+32,y:gAt(top.x+30)-80};
+  // pine trees on the lower slopes, goats & friends
+  for(const f of [-.95,-.8,-.62,.58,.75,.9]){const x=top.x+f*top.w;if(tH(x)<520)makePlant('pine',x,gAt(x))}
+  for(const f of [-.5,.45]){const x=top.x+f*top.w;add(makeAnimal('goat',x,gAt(x)-30,f<0?1:-1))}
+  {const x=top.x-1.15*top.w;add(makeAnimal('vex',x,gAt(x)-30,1))}
+  {const d=BIRDS.find(b=>b.name==='Eagle');if(d)birdAt(d,top.x+.3*top.w)}
+  {const d=BIRDS.find(b=>b.name==='Kea');if(d)birdAt(d,top.x-.25*top.w)}
+  for(const f of [-.55,.5,.85]){const x=top.x+f*top.w+R(-40,40);natureSpawn('blkraw:stone',x,gAt(x)-30)}
+  cam.z=.45;cam.x=top.x-W/(2*cam.z);cam.y=gAt(top.x)-H*.14/cam.z;clampCam();updView();
+}}
+let mtnFlag=null;
+{const _lm=loadMap;loadMap=function(id,silent){terrainOn=(MAPS[id]||{}).scene==='mountain';MTN_X0=W*.5;mtnPeaks.clear();mtnFlag=null;_lm(id,silent)}}
+{const _gc=genChunk;genChunk=function(k){
+  if(MAP.scene!=='mountain')return _gc(k);
+  const x0=k*CH;if(x0+CH>-60&&x0<W+60)return;
+  const R=rng(k*97+31),at=f=>x0+f*CH;
+  for(const f of [.15,.5,.85]){const x=at(f+R()*.1);if(tH(x)<560&&R()<.7)makePlant('pine',x,gAt(x))}
+  const alive=bodies.filter(b=>(b.type==='bird'||b.type==='animal')).length;
+  if(alive<70){const life=MAP_LIFE.mountain;
+    if(R()<.6){const d=BIRDS.find(b=>b.name===life.b[(R()*life.b.length)|0]);if(d){const x=at(.3+R()*.4);add(makeBird(d,x,gAt(x)-40*d.s,1)).toughT=2}}
+    if(R()<.5){const kk=life.a[(R()*life.a.length)|0],d=ANIMALS[kk];if(d){const x=at(.2+R()*.6);add(makeAnimal(kk,x,gAt(x)-(d.ll+d.br)*d.s-6,1))}}}
+}}
+function drawMtnFlag(c){if(!terrainOn||!mtnFlag)return;const {x,y}=mtnFlag,w=Math.sin(simTime*4)*3;c.fillStyle='#8a8a8a';c.fillRect(x-2,y,4,gAt(x)-y+4);
+  c.fillStyle='#e01e37';c.beginPath();c.moveTo(x,y);c.quadraticCurveTo(x+18,y+4+w,x+36,y+8+w);c.quadraticCurveTo(x+18,y+16+w,x,y+22);c.closePath();c.fill();
+  c.fillStyle='#fff';c.font='bold 12px system-ui';c.textAlign='left';c.fillText('🐦',x+8,y+16)}
+
+/* =================== CARS =================== */
+const CARS={
+  sports:{n:'Sports car',ic:'🏎️',L:78,wr:11,wy:13,wx:27,col:'#e01e37',col2:'#a8102a',top:'cabin',spd:13,acc:.42,seats:[[4,-16]]},
+  race:{n:'Race car',ic:'🏁',L:90,wr:12,wy:11,wx:33,col:'#1f6fd0',col2:'#ffd23f',top:'race',spd:18,acc:.6,seats:[[-2,-12]]},
+  police:{n:'Police car',ic:'🚓',L:84,wr:12,wy:14,wx:28,col:'#f4f4f2',col2:'#1a1a2e',top:'sedan',siren:1,spd:12,acc:.4,seats:[[10,-20],[-14,-20]]},
+  taxi:{n:'Taxi',ic:'🚕',L:84,wr:12,wy:14,wx:28,col:'#ffcc1a',col2:'#1a1a1a',top:'sedan',taxi:1,spd:10,acc:.35,seats:[[10,-20],[-14,-20]]},
+  jeep:{n:'Jeep',ic:'🚙',L:80,wr:15,wy:18,wx:27,col:'#4b6a3a',col2:'#2e4224',top:'jeep',spd:10,acc:.5,grip:1,seats:[[8,-20],[-14,-20]]},
+  pickup:{n:'Pickup truck',ic:'🛻',L:96,wr:14,wy:16,wx:32,col:'#2f6bd8',col2:'#1f4aa0',top:'pickup',spd:10,acc:.42,seats:[[16,-22],[-22,-10],[-36,-10]]},
+  monster:{n:'Monster truck',ic:'🛞',L:96,wr:26,wy:34,wx:36,col:'#8a2be2',col2:'#ffd23f',top:'monster',spd:11,acc:.6,grip:1,seats:[[10,-22]]},
+  bus:{n:'School bus',ic:'🚌',L:150,wr:14,wy:22,wx:52,col:'#ffb81a',col2:'#1a1a1a',top:'bus',spd:8,acc:.3,seats:[[48,-30],[22,-30],[-4,-30],[-30,-30],[-56,-30]]},
+  fire:{n:'Fire truck',ic:'🚒',L:140,wr:15,wy:20,wx:48,col:'#d62828',col2:'#f4f4f2',top:'fire',siren:1,spd:9,acc:.32,seats:[[48,-28],[20,-28]]},
+  icecream:{n:'Ice cream truck',ic:'🍦',L:110,wr:13,wy:18,wx:36,col:'#ffd6e8',col2:'#6ad1ff',top:'van',spd:7,acc:.3,music:1,seats:[[34,-28]]},
+  buggy:{n:'Dune buggy',ic:'🏜️',L:72,wr:15,wy:16,wx:26,col:'#ff7a1a',col2:'#2a2a2a',top:'buggy',spd:13,acc:.55,grip:1,seats:[[0,-16]]},
+  tiny:{n:'Bird car',ic:'🐤',L:46,wr:8,wy:9,wx:16,col:'#ffd23f',col2:'#ff8a33',top:'bubble',spd:8,acc:.3,seats:[[0,-12]]},
+};
+const CAR_ITEMS=Object.entries(CARS).map(([k,c])=>({id:'car:'+k,ic:c.ic,n:c.n,h:'<b>'+c.n+'</b> — tap it to drive (tap again: reverse, again: stop). Drop a bird or animal on it to give them a ride!'+(c.siren?' 🚨 Siren!':'')}));
+function makeCar(kind,x,y){
+  const C=CARS[kind],b=newBody('car',{kind,motor:0,wa:0,riders:[],sirenT:0});
+  const n=Math.max(4,Math.round(C.L/18)),sp=C.L/(n-1),r=Math.min(9,sp*.55);
+  for(let i=0;i<n;i++)b.ps.push(new P(x-C.L/2+i*sp,y,r,b,{im:.5,fric:.4,dens:C.top==='bus'||C.top==='fire'?.9:.6}));
+  for(let i=0;i<n;i++)for(let j=i+1;j<n;j++)stick(b,b.ps[i],b.ps[j]);
+  b.w1=new P(x-C.wx,y+C.wy,C.wr,b,{im:.7,fric:C.grip?.12:.06,rest:C.top==='monster'?.15:.05,dens:.7});b.w2=new P(x+C.wx,y+C.wy,C.wr,b,{im:.7,fric:C.grip?.12:.06,rest:C.top==='monster'?.15:.05,dens:.7});
+  b.ps.push(b.w1,b.w2);
+  for(const w of [b.w1,b.w2]){const near=b.ps.slice(0,n).map((p,i)=>[Math.abs(p.x-w.x),i]).sort((a,c)=>a[0]-c[0]).slice(0,2).map(a=>a[1]);for(const i of near)stick(b,w,b.ps[i],.75);stick(b,w,b.ps[w===b.w1?n-1:0],.45)}
+  stick(b,b.w1,b.w2,.85);
+  return b;
+}
+function carFrame(b){const n=b.ps.length-2,a=b.ps[0],z=b.ps[n-1];const cx=(a.x+z.x)/2,cy=(a.y+z.y)/2,ang=Math.atan2(z.y-a.y,z.x-a.x);return{cx,cy,ang,co:Math.cos(ang),si:Math.sin(ang)}}
+function carWorld(F,lx,ly){return{x:F.cx+F.co*lx-F.si*ly,y:F.cy+F.si*lx+F.co*ly}}
+function riderCore(o){return o.type==='bird'?o.U:o.C}
+function carSpawn(id,x,y){if(!id.startsWith('car:'))return false;const k=id.slice(4);if(!CARS[k])return undefined;const C=CARS[k];
+  const b=add(makeCar(k,x,Math.min(y,(terrainOn?gAt(x):groundY)-C.wy-C.wr-8)));
+  if(terrainOn&&tH(x)>0){const a=Math.atan2(gAt(x+C.L/2)-gAt(x-C.L/2),C.L);rotateBody(b,a);let lift=0;for(const p of b.ps){const pen=p.y+p.r-gAt(p.x)+4;if(pen>lift)lift=pen}if(lift>0)for(const p of b.ps){p.y-=lift;p.py=p.y}}
+  tone('square',90,110,.25,.04,200,x);return b}
+function carActivate(b){if(b.type!=='car')return false;const C=CARS[b.kind];
+  b.motor=b.motor===0?1:b.motor===1?-1:0;toast(C.ic+' '+['Stopped','Driving →','← Reversing'][b.motor===0?0:b.motor===1?1:2]);
+  tone('square',b.motor?120:90,b.motor?260:60,.25,.06,300,b.ps[0].x);if(b.motor&&C.siren)b.sirenOn=true;else if(!b.motor)b.sirenOn=false;return true}
+function carUpdate(dt){
+  for(const b of bodies){if(b.type!=='car'||b.dead)continue;const C=CARS[b.kind];
+    // wheels spin
+    const vx=b.w1.x-(b.w1.lx??b.w1.x);b.w1.lx=b.w1.x;b.wa+=vx/C.wr;
+    const F=carFrame(b);
+    // flipped over? after a moment it rolls back onto its wheels
+    {const upside=Math.abs(F.ang)>Math.PI*.55,[cvx,cvy]=vel(b.ps[0]);if(upside&&Math.hypot(cvx,cvy)<1.5&&!b.dragT){b.flipT=(b.flipT||0)+dt/60;if(b.flipT>1.5){b.flipT=0;rotateBody(b,-F.ang);for(const p of b.ps){p.y-=30;p.py=p.y}tone('triangle',300,600,.2,.04,null,F.cx)}}else b.flipT=0}
+    {const fr=b.motor?.02:.5;b.w1.fric=fr;b.w2.fric=fr}
+    for(const w of [b.w1,b.w2])if(w.touch&&w.cn){w.gF=frameNo;w.gcn=w.cn}
+    if(b.motor){let tx=0,ty=0,n=0;for(const w of [b.w1,b.w2])if(frameNo-(w.gF??-99)<8&&w.gcn){tx+=-w.gcn[1];ty+=w.gcn[0];n++}
+      if(n){const l=Math.hypot(tx,ty)||1;tx/=l;ty/=l;const[cvx,cvy]=vel(b.ps[0]);const along=(cvx*tx+cvy*ty)*b.motor;
+        if(along<C.spd){const k=C.acc*dt+G*dt*Math.max(0,-ty*b.motor)*1.05;for(const p of b.ps)addVel(p,tx*b.motor*k,ty*b.motor*k)}}
+      if(frameNo%10===0&&okSnd('eng'+b.born,150))tone('sawtooth',55+Math.abs(vx)*6,60+Math.abs(vx)*6,.16,.012,300,b.w1.x)}
+    // keep it from flipping too easily
+    if(b.sirenOn&&C.siren&&okSnd('siren'+b.born,700)){tone('square',900,700,.35,.025,1200,F.cx);tone('square',700,900,.35,.025,1200,F.cx,.35)}
+    if(b.motor&&C.music&&okSnd('ice'+b.born,1600)){[784,659,698,587,659,523].forEach((f,i)=>tone('triangle',f,f,.16,.025,null,F.cx,i*.2))}
+    // riders
+    b.riders=b.riders.filter(o=>{if(o.dead||!bodies.includes(o)||o.dragT||(o.type==='bird'?!o.alive&&false:false)){o.holder=null;o.inCar=null;return false}return true});
+    b.riders.forEach((o,i)=>{const s=C.seats[i%C.seats.length],P0=carWorld(F,s[0],s[1]),core=riderCore(o);
+      const dx=P0.x-core.x,dy=P0.y-core.y;const cvx=b.ps[0].x-b.ps[0].px,cvy=b.ps[0].y-b.ps[0].py;
+      for(const p of o.ps){p.x+=dx*.5;p.y+=dy*.5;p.px=p.x-cvx;p.py=p.y-cvy}
+      if(o.type==='bird'){if(b.motor)o.f=b.motor>0?1:-1;o.flyT=0;o.goal=null}});
+    // pick up creatures that were just dropped on it
+    if(b.riders.length<C.seats.length)for(const o of bodies){if((o.type!=='bird'&&o.type!=='animal')||o.inCar||o.dead)continue;
+      if(o.dragT){o._dropF=frameNo;continue}if(frameNo-(o._dropF??-99)>40)continue;
+      const core=riderCore(o);const lx=(core.x-F.cx)*F.co+(core.y-F.cy)*F.si,ly=-(core.x-F.cx)*F.si+(core.y-F.cy)*F.co;
+      if(Math.abs(lx)<C.L/2+10&&ly>-70&&ly<10){o.inCar=b;o.holder=b;b.riders.push(o);o._dropF=-99;
+        fx.push({t:'text',x:core.x,y:core.y-30,vy:-.7,life:1.2,txt:(o.name||(o.def.name||o.def.n))+' got in! 🚗'});tone('triangle',900,1300,.12,.04,null,core.x);if(b.riders.length>=C.seats.length)break}}
+  }
+}
+function drawWheel(c,w,r,ang,monster){c.save();c.translate(w.x,w.y);c.fillStyle='#1c1c1e';circle(c,0,0,r);
+  if(monster){c.strokeStyle='#333';c.lineWidth=3;for(let i=0;i<12;i++){const a=ang+i*TAU/12;c.beginPath();c.moveTo(Math.cos(a)*r*.8,Math.sin(a)*r*.8);c.lineTo(Math.cos(a)*r,Math.sin(a)*r);c.stroke()}}
+  c.fillStyle='#b8bec6';circle(c,0,0,r*.5);c.strokeStyle='#5a5f66';c.lineWidth=Math.max(1.2,r*.1);c.beginPath();for(let i=0;i<5;i++){const a=ang+i*TAU/5;c.moveTo(0,0);c.lineTo(Math.cos(a)*r*.48,Math.sin(a)*r*.48)}c.stroke();c.fillStyle='#3a3f46';circle(c,0,0,r*.15);c.restore()}
+function drawCar(c,b){
+  const C=CARS[b.kind],F=carFrame(b),L=C.L,h2=L/2;
+  // suspension struts
+  c.strokeStyle='#3a3a3a';c.lineWidth=3;for(const w of [b.w1,b.w2]){const lx=(w.x-F.cx)*F.co+(w.y-F.cy)*F.si;const a=carWorld(F,lx,2);c.beginPath();c.moveTo(a.x,a.y);c.lineTo(w.x,w.y);c.stroke()}
+  c.save();c.translate(F.cx,F.cy);c.rotate(F.ang);c.lineJoin='round';
+  const body=C.col,trim=C.col2,glass='rgba(160,215,245,.85)',dk='rgba(0,0,0,.28)';
+  const lower=(y0,y1,x0=-h2,x1=h2,rad=6)=>{c.fillStyle=body;rr(c,x0,y0,x1-x0,y1-y0,rad);c.fill();c.strokeStyle=dk;c.lineWidth=1.5;c.stroke()};
+  const win=(x0,y0,w,h)=>{c.fillStyle=glass;rr(c,x0,y0,w,h,3);c.fill()};
+  switch(C.top){
+    case 'cabin':lower(-6,8);c.fillStyle=body;c.beginPath();c.moveTo(-22,-6);c.quadraticCurveTo(-8,-22,14,-20);c.lineTo(26,-6);c.closePath();c.fill();c.stroke();
+      c.fillStyle=glass;c.beginPath();c.moveTo(-14,-7);c.quadraticCurveTo(-4,-18,8,-17);c.lineTo(20,-7);c.closePath();c.fill();c.fillStyle=trim;c.fillRect(-h2+4,0,L-8,2.5);break;
+    case 'race':lower(-4,6,-h2,h2,4);c.fillStyle=trim;c.fillRect(-h2-4,-14,10,4);c.fillRect(-h2,-14,3,10);c.fillRect(h2-2,0,10,4);c.fillStyle='#1a1a1a';rr(c,-10,-12,20,8,4);c.fill();
+      c.fillStyle='#fff';circle(c,6,0,5);c.fillStyle='#1a1a1a';c.font='bold 7px system-ui';c.textAlign='center';c.fillText('1',6,2.5);break;
+    case 'sedan':lower(-6,9);c.fillStyle=C.taxi?body:trim;c.beginPath();c.moveTo(-28,-6);c.lineTo(-18,-22);c.lineTo(16,-22);c.lineTo(28,-6);c.closePath();c.fill();c.stroke();
+      win(-16,-19,14,11);win(2,-19,14,11);
+      if(C.taxi){c.fillStyle='#1a1a1a';for(let i=0;i<8;i++)c.fillRect(-h2+6+i*9,1,4.5,3);c.fillStyle='#fff';rr(c,-8,-29,16,7,2);c.fill();c.fillStyle='#1a1a1a';c.font='bold 6px system-ui';c.textAlign='center';c.fillText('TAXI',0,-23.5)}
+      else{c.fillStyle=trim;c.fillRect(-h2+2,-2,L-4,6);c.fillStyle='#fff';c.font='bold 7px system-ui';c.textAlign='center';c.fillText('POLICE',0,4)}
+      if(C.siren){const on=b.sirenOn&&(frameNo>>3)%2;c.fillStyle=on?'#ff2a2a':'#801010';rr(c,-9,-27,8,5,2);c.fill();c.fillStyle=!on&&b.sirenOn?'#2a6aff':'#10204a';rr(c,1,-27,8,5,2);c.fill()}break;
+    case 'jeep':lower(-6,10);c.strokeStyle='#2a2a2a';c.lineWidth=3;c.beginPath();c.moveTo(-24,-6);c.lineTo(-20,-26);c.lineTo(14,-26);c.lineTo(18,-6);c.stroke();win(14,-22,3,15);
+      c.fillStyle='#1c1c1e';circle(c,-h2-5,-2,9);c.fillStyle='#5a5f66';circle(c,-h2-5,-2,4);break;
+    case 'pickup':lower(-6,10);c.fillStyle=body;c.beginPath();c.moveTo(0,-6);c.lineTo(6,-26);c.lineTo(32,-26);c.lineTo(42,-6);c.closePath();c.fill();c.stroke();win(10,-23,22,13);
+      c.fillStyle=C.col2;c.fillRect(-h2+2,-14,4,10);c.fillRect(-4,-14,4,10);break;
+    case 'monster':lower(-12,6,-h2,h2,8);c.fillStyle=body;c.beginPath();c.moveTo(-20,-12);c.lineTo(-12,-30);c.lineTo(18,-30);c.lineTo(28,-12);c.closePath();c.fill();c.stroke();win(-8,-27,13,13);win(8,-27,12,13);
+      c.fillStyle=trim;c.beginPath();for(let i=0;i<5;i++){const x=-h2+10+i*16;c.moveTo(x,-12);c.lineTo(x+8,-4);c.lineTo(x+2,0)}c.fill();break;
+    case 'bus':lower(-36,10,-h2,h2,8);for(let i=0;i<6;i++)win(-h2+12+i*22,-30,16,13);win(h2-14,-30,10,22);c.fillStyle=trim;c.fillRect(-h2,-8,L,3);c.fillRect(-h2,0,L,2);
+      c.fillStyle='#1a1a1a';c.font='bold 7px system-ui';c.textAlign='center';c.fillText('SCHOOL BUS',0,-12);break;
+    case 'fire':lower(-26,10,-h2,h2,6);win(h2-30,-22,22,13);c.fillStyle=trim;c.fillRect(-h2,-4,L,4);c.strokeStyle='#c9ced6';c.lineWidth=2.5;c.beginPath();c.moveTo(-h2+6,-30);c.lineTo(h2-36,-30);c.moveTo(-h2+6,-36);c.lineTo(h2-36,-36);
+      for(let x=-h2+10;x<h2-36;x+=10){c.moveTo(x,-30);c.lineTo(x,-36)}c.stroke();
+      {const on=b.sirenOn&&(frameNo>>3)%2;c.fillStyle=on?'#ff2a2a':'#801010';rr(c,h2-26,-30,10,5,2);c.fill();c.fillStyle=!on&&b.sirenOn?'#ff2a2a':'#801010';rr(c,h2-14,-30,10,5,2);c.fill()}break;
+    case 'van':lower(-34,10,-h2,h2,10);win(h2-26,-30,18,15);win(-20,-26,26,12);c.fillStyle=trim;c.fillRect(-h2,-2,L,4);
+      c.fillStyle='#fff';rr(c,-h2+6,-46,22,14,4);c.fill();c.fillStyle='#f2c79a';c.beginPath();c.moveTo(-h2+12,-32);c.lineTo(-h2+17,-20);c.lineTo(-h2+22,-32);c.fill();c.fillStyle='#ff9ac8';circle(c,-h2+17,-36,6);break;
+    case 'buggy':lower(-4,8,-h2,h2,4);c.strokeStyle='#2a2a2a';c.lineWidth=3;c.beginPath();c.moveTo(-26,-4);c.lineTo(-14,-26);c.lineTo(10,-26);c.lineTo(22,-4);c.moveTo(-2,-26);c.lineTo(-2,-4);c.stroke();break;
+    case 'bubble':lower(-4,8,-h2,h2,8);c.fillStyle=glass;c.beginPath();c.arc(0,-4,16,Math.PI,0);c.fill();c.strokeStyle=dk;c.stroke();c.fillStyle=trim;c.beginPath();c.moveTo(h2,0);c.lineTo(h2+8,3);c.lineTo(h2,6);c.fill();break;
+  }
+  // lights
+  c.fillStyle=light<.4||b.motor?'#fff6b0':'#f2efe0';rr(c,h2-4,-2,5,5,2);c.fill();c.fillStyle='#ff3b3b';rr(c,-h2-1,-2,4,5,1.5);c.fill();
+  c.restore();
+  if(light<.4&&b.motor){c.save();c.globalAlpha=.25;c.fillStyle='#fff6b0';const a=carWorld(F,h2,0),d=b.motor>0?1:-1;if(d>0){c.beginPath();c.moveTo(a.x,a.y);c.lineTo(a.x+F.co*160-F.si*30,a.y+F.si*160+F.co*30);c.lineTo(a.x+F.co*160+F.si*30,a.y+F.si*160-F.co*30);c.fill()}c.restore()}
+  drawWheel(c,b.w1,CARS[b.kind].wr,b.wa,C.top==='monster');drawWheel(c,b.w2,CARS[b.kind].wr,b.wa,C.top==='monster');
+}
+
 /* =================== UNDO =================== */
 const undoStack=[];
 function pushUndo(){
@@ -4405,7 +4612,7 @@ cv.addEventListener('pointerdown',e=>{
   const x=WX(e),y=WY(e);
   if(mode.id!=='inspect'&&mode.kind!=='spawn'&&!(mode.id==='drag'&&!pick(x,y,38)))pushUndo();
   if(mode.kind==='spawn'){
-    {let pk=pick(x,y,4);if(!pk){const q=pick(x,y,22/cam.z);if(q&&(q.body.type==='gun'||q.body.type==='xpl'))pk=q}if(pk&&!pk.pinned&&pk.body.type!=='branch'){if(pk.body.type==='gun')setGun(pk.body);pushUndo();drags.set(e.pointerId,{p:pk,x,y,t0:performance.now(),sx:x,sy:y});return}}
+    {let pk=pick(x,y,4);if(!pk){const q=pick(x,y,22/cam.z);if(q&&(q.body.type==='gun'||q.body.type==='xpl'||q.body.type==='car'))pk=q}if(!pk){for(const b of bodies)if(b.type==='car'&&!b.dead){const F=carFrame(b),lx=(x-F.cx)*F.co+(y-F.cy)*F.si,ly=-(x-F.cx)*F.si+(y-F.cy)*F.co;if(Math.abs(lx)<CARS[b.kind].L/2&&ly>-40&&ly<CARS[b.kind].wy+CARS[b.kind].wr){pk=b.ps[0];break}}}if(pk&&!pk.pinned&&pk.body.type!=='branch'){if(pk.body.type==='gun')setGun(pk.body);pushUndo();drags.set(e.pointerId,{p:pk,x,y,t0:performance.now(),sx:x,sy:y});return}}
     if(mode.id==='pond'){pushUndo();pondDraw={x0:x,x1:x,id:e.pointerId};return}
     // wait to see if this is a tap (place it), a hold (place it and drag it) or a swipe/pinch (move the camera)
     pendingSpawn={pid:e.pointerId,id:mode.id,x,y,wx:x,wy:y,sx:e.clientX,sy:e.clientY,cx:cam.x,cy:cam.y,t0:performance.now()};
@@ -4611,7 +4818,7 @@ function buildItems(){
   if(!icons)icons=BIRDS.map(birdIcon);
   itemsEl.innerHTML='';
   const list=tab==='birds'?BIRDS.map((d,i)=>({id:'bird:'+i,n:d.name,kind:'spawn',icon:icons[i],h:'Tap to place <b>'+d.name+'</b> — then drag to fling'})):
-    tab==='weapons'?WEAPONS.map(it=>({...it,kind:'spawn'})):tab==='bombs'?BOMBS_TAB.map(it=>({...it,kind:'spawn'})):tab==='build'?BUILD_TAB.map(it=>({...it,kind:'spawn'})):tab==='animals'?ANIMAL_TAB.map(it=>({...it,kind:'spawn'})):tab==='plants'?PLANTS.map(it=>({...it,kind:'spawn'})):tab==='items'?ITEMS.map(it=>({...it,kind:'spawn'})):tab==='world'?WORLD.map(it=>({kind:'spawn',...it})):tab==='powers'?POWERS.map(t=>({...t,kind:'tool'})):TOOLS.map(t=>({...t,kind:'tool'}));
+    tab==='weapons'?WEAPONS.map(it=>({...it,kind:'spawn'})):tab==='bombs'?BOMBS_TAB.map(it=>({...it,kind:'spawn'})):tab==='cars'?[...CAR_ITEMS,...ITEMS.filter(it=>it.id==='cart'||it.id==='boat')].map(it=>({...it,kind:'spawn'})):tab==='build'?BUILD_TAB.map(it=>({...it,kind:'spawn'})):tab==='animals'?ANIMAL_TAB.map(it=>({...it,kind:'spawn'})):tab==='plants'?PLANTS.map(it=>({...it,kind:'spawn'})):tab==='items'?ITEMS.map(it=>({...it,kind:'spawn'})):tab==='world'?WORLD.map(it=>({kind:'spawn',...it})):tab==='powers'?POWERS.map(t=>({...t,kind:'tool'})):TOOLS.map(t=>({...t,kind:'tool'}));
   const sres=searchList(searchQ);
   for(const it of (sres||list)){
     if(it.sep){if(!sres){const sp=document.createElement('div');sp.textContent=it.sep;sp.style.cssText='flex:0 0 auto;writing-mode:vertical-rl;transform:rotate(180deg);color:#9fb3cf;font-size:11px;font-weight:700;text-align:center;padding:0 2px';itemsEl.appendChild(sp)}continue}
@@ -4668,7 +4875,7 @@ function saveWorld(){
   const idx=d=>BIRDS.indexOf(d);
   const data={v:1,tod,S:{...S},walls:walls.filter(w=>!w.trunk&&!w.house&&!w.feeder&&!w.lamp).map(w=>({...w})),lamps:lamps.map(l=>({x:l.x,base:l.base})),sprinklers:sprinklers.map(q=>({x:q.x,base:q.base})),slings:slings.map(q=>({x:q.x,base:q.base})),portals:portals.map(pr=>({a:pr.a,b:pr.b})),mirrors:mirrors.map(m=>({x:m.x,base:m.base})),feeders:feeders.map(f=>({x:f.x,base:f.base})),ponds:ponds.map(p=>({x:p.x,w:p.w})),trees:trees.map(t=>({x:t.x,base:t.base})),houses:houses.map(h=>({x:h.x,base:h.base})),
     bodies:bodies.concat(houses.flatMap(h=>h.occ)).filter(b=>!['branch','anchor','piece','shard','chunk','seed','bell','swing','meteor','pinata'].includes(b.type)).map(b=>{const c=centroid(b);
-      const id=b.type==='egg'?'egg:'+b.defIdx:b.type==='bird'?'bird:'+idx(b.def):b.type==='furn'?b.kind:b.type==='plank'&&b.cols<8?null:b.type==='seesaw'?'seesaw':b.type==='animal'?'animal:'+b.kind:b.type==='block'?'blkraw:'+b.mat:b.type==='sword'?'sword:'+b.kind:b.type==='gun'?'gun:'+b.kind:b.type==='xpl'?(XPL[b.kind].hidden?null:'xpl:'+b.kind):b.type;
+      const id=b.type==='egg'?'egg:'+b.defIdx:b.type==='bird'?'bird:'+idx(b.def):b.type==='furn'?b.kind:b.type==='plank'&&b.cols<8?null:b.type==='seesaw'?'seesaw':b.type==='animal'?'animal:'+b.kind:b.type==='block'?'blkraw:'+b.mat:b.type==='sword'?'sword:'+b.kind:b.type==='gun'?'gun:'+b.kind:b.type==='car'?'car:'+b.kind:b.type==='xpl'?(XPL[b.kind].hidden?null:'xpl:'+b.kind):b.type;
       return id?{id,x:c.x,y:c.y,sc:b.scale||1,dead:b.type==='bird'&&!b.alive,f:b.f,name:b.name,hat:b.hat,paint:b.paint}:null}).filter(Boolean)};
   natureSave(data);try{localStorage.setItem('birdSandboxWorld',JSON.stringify(data));$('saveMsg').textContent='Saved ✓ ('+data.bodies.length+' things)';toast('World saved 💾')}catch(e){$('saveMsg').textContent='Could not save on this device';}
 }
