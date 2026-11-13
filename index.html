@@ -833,7 +833,8 @@ function birdAI(b,dt){
   const rhx=(H.x-H.px)-(U.x-U.px),rhy=(H.y-H.py)-(U.y-U.py);addVel(H,-rhx*.08,-rhy*.08);
   // legs: walking alternates feet, scratching lifts a foot to the head
   const walking=b.act==='walk'&&grounded;
-  if(walking)b.wph+=dt*.32;
+  const tinyK=s<.8?Math.min(2.2,.8/Math.max(s,.2)):1; // small birds take quicker little steps
+  if(walking)b.wph+=dt*.32*tinyK;
   const st1=walking?Math.sin(b.wph):0,st2=walking?Math.sin(b.wph+Math.PI):0;
   if(att.leg1){addVel(K1,(L.x-2*s*f+st1*3*s-K1.x)*k*.5,(L.y-uy*7*s*LL-K1.y)*k*.5);addVel(F1,(L.x-3*s*f+st1*6*s-F1.x)*k*.6,(L.y-uy*(14*LL-Math.max(0,Math.cos(b.wph))*4*(walking?1:0))*s-F1.y)*k*.6)}
   if(att.leg2){
@@ -854,7 +855,9 @@ function birdAI(b,dt){
     addVel(Wt,(U.x-(spread?18:13)*s*f-Wt.x)*k*.6,(U.y-uy*(spread?-6:15)*s-Wt.y)*k*.6);
   }
   if(walking){
-    const[vx]=vel(U);for(const p of [U,L,H,Bk])addVel(p,(f*1.4*s*(D0.waddle?.7:1)*(D0.run||1)-vx)*.3*dt,0);
+    const[vx]=vel(U);const ws=1.4*(s<.8?Math.max(s,.95):s);for(const p of [U,L,H,Bk])addVel(p,(f*ws*(D0.waddle?.7:1)*(D0.run||1)-vx)*.3*dt,0);
+    // tiny birds hop along
+    if(s<.75&&(F1.touch||F2.touch)&&Math.random()<.1*dt)for(const p of b.ps)addVel(p,f*2,-2.8);
     if(D0.waddle)addVel(U,Math.sin(b.wph)*.5*dt,0);
     if(Math.sin(b.wph)*Math.sin(b.wph-dt*.32)<0)stepSound(U.x);
   }
