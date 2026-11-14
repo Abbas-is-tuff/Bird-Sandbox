@@ -1690,9 +1690,10 @@ function render(){
       case 'flash':ctx.fillStyle='rgba(255,220,120,.55)';circle(ctx,e.x,e.y,e.r*(1.1-a*.7));break;
       case 'tracer':ctx.strokeStyle=e.col;ctx.lineWidth=e.w;ctx.lineCap='round';if(e.laser){ctx.shadowColor=e.col;ctx.shadowBlur=10}ctx.beginPath();ctx.moveTo(e.x+(e.x2-e.x)*(1-a)*.6,e.y+(e.y2-e.y)*(1-a)*.6);ctx.lineTo(e.x2,e.y2);ctx.stroke();ctx.shadowBlur=0;break;
       case 'muzzle':ctx.save();ctx.translate(e.x,e.y);ctx.rotate(e.a);ctx.fillStyle=e.col;ctx.beginPath();ctx.moveTo(0,-5*e.s);ctx.lineTo(16*e.s,0);ctx.lineTo(0,5*e.s);ctx.closePath();ctx.fill();ctx.fillStyle='#fff';circle(ctx,2,0,3*e.s);ctx.restore();break;
+      case 'shock':{const k=Math.max(.01,Math.min(1,(1-Math.min(1,a))*1.6));ctx.strokeStyle='rgba(255,240,210,'+(a*.8)+')';ctx.lineWidth=30*a+4;ctx.beginPath();ctx.arc(e.x,e.y,e.R*k,0,TAU);ctx.stroke();break}
       case 'arrowStuck':ctx.save();ctx.translate(e.x,e.y);ctx.rotate(e.a);ctx.strokeStyle='#8a6a3a';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-18,0);ctx.lineTo(2,0);ctx.stroke();ctx.fillStyle='#f4f4f2';ctx.fillRect(-20,-3,6,6);ctx.restore();break;
       case 'shell':ctx.save();ctx.translate(e.x,e.y);ctx.rotate(e.rot);ctx.fillStyle='#d4a017';ctx.fillRect(-3,-1.3,6,2.6);ctx.restore();break;
-      case 'mushroom':{const k=1-a,h=60+k*360,cw=50+k*170;ctx.globalAlpha=Math.min(1,a*1.6);ctx.fillStyle='rgba(120,95,70,.75)';ctx.fillRect(e.x-18-k*20,e.y-h,36+k*40,h);
+      case 'mushroom':{const k=1-a,S=e.s||1,h=(60+k*360)*S,cw=(50+k*170)*S;ctx.globalAlpha=Math.min(1,a*1.6);ctx.fillStyle='rgba(120,95,70,.75)';ctx.fillRect(e.x-(18+k*20)*S,e.y-h,(36+k*40)*S,h);
         const g2=ctx.createRadialGradient(e.x,e.y-h,10,e.x,e.y-h,cw);g2.addColorStop(0,'rgba(255,200,90,.95)');g2.addColorStop(.4,'rgba(200,110,50,.85)');g2.addColorStop(1,'rgba(90,70,55,0)');ctx.fillStyle=g2;ctx.beginPath();ctx.ellipse(e.x,e.y-h,cw,cw*.6,0,0,TAU);ctx.fill();break}
       case 'heart':ctx.font='20px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('❤️',e.x,e.y);break;
       case 'zzz':ctx.font='bold 13px system-ui';ctx.textAlign='center';ctx.fillStyle='#fff';ctx.fillText('z',e.x+Math.sin(e.life*8)*4,e.y);break;
@@ -1747,7 +1748,7 @@ function updateFx(dt){
       case 'leaf':e.vx+=(windNow*.35-e.vx)*.04*dt;e.vy=Math.min(e.vy+.03*dt,1.2);e.x+=(e.vx+Math.sin(e.life*20)*.6)*dt;e.y+=e.vy*dt;e.rot+=e.vr*dt;if(e.y>groundY-2){e.y=groundY-2;e.vx*=.9;e.vr=0}e.life-=.004*dt;break;
       case 'ember':e.x+=(e.vx+windNow*.05)*dt;e.y+=e.vy*dt;e.vy-=.005*dt;e.life-=.012*dt;break;
       case 'flash':e.life-=.08*dt;break;
-      case 'tracer':e.life-=.2*dt;break;case 'arrowStuck':e.life-=.003*dt;break;case 'muzzle':e.life-=.3*dt;break;
+      case 'tracer':e.life-=.2*dt;break;case 'shock':e.life-=.012*dt;break;case 'arrowStuck':e.life-=.003*dt;break;case 'muzzle':e.life-=.3*dt;break;
       case 'shell':e.vy+=.3*dt;e.x+=e.vx*dt;e.y+=e.vy*dt;e.rot+=e.vr*dt;if(e.y>groundY-2){e.y=groundY-2;e.vy*=-.3;e.vx*=.6;e.vr*=.5}e.life-=.01*dt;break;
       case 'mushroom':e.life-=.0035*dt;break;
       case 'heart':case 'zzz':e.y+=e.vy*dt;e.life-=.015*dt;break;
@@ -4051,7 +4052,7 @@ const XPL={
   ice:{n:'Ice bomb',ic:'🧊',r:10,fuse:150,R:190,F:6,ice:1,h:'freezes everything around it — no damage'},
   firecracker:{n:'Firecrackers',ic:'🎉',r:6,fuse:90,R:50,F:6,cracker:1,h:'lots of loud little pops — scares birds, barely hurts'},
   airstrike:{n:'Airstrike',ic:'✈️',air:1,h:'tap anywhere — bombs rain from the sky'},
-  nuke:{n:'Nuke',ic:'☢️',r:18,fuse:360,R:650,F:55,nuke:1,h:'6 second countdown… then a HUGE boom. Run!'},
+  nuke:{n:'Nuke',ic:'☢️',r:22,fuse:360,R:1500,F:72,nuke:1,h:'6 second countdown… then a HUGE boom. Run!'},
   rocketshell:{n:'Rocket',ic:'🚀',r:6,hidden:1,R:170,F:24,impact:1},
 };
 const BOMB_ITEMS=Object.entries(XPL).filter(([k,x])=>!x.hidden).map(([k,x])=>({id:'xpl:'+k,ic:x.ic,n:x.n,h:'<b>'+x.n+'</b> — '+x.h}));
@@ -4084,17 +4085,23 @@ function xplBlow(b){
       for(const p of allP){const dx=p.x-x,dy=p.y-y,d=Math.hypot(dx,dy);if(d<X.R&&d>0)addVel(p,dx/d*X.F*(1-d/X.R),dy/d*X.F*(1-d/X.R)-1)}
       setTimeout(pops,rand(90,220))};pops();return}
   if(X.nuke){
-    explode(c.x,c.y,X.R*.45,X.F);
-    for(const p of allP){if(p.body.dead||p.pinned)continue;const dx=p.x-c.x,dy=p.y-c.y,d=Math.hypot(dx,dy);if(d<X.R&&d>X.R*.45)addVel(p,dx/d*X.F*.6*(1-d/X.R),dy/d*X.F*.6*(1-d/X.R)-6*(1-d/X.R))}
+    const KZ=X.R*.42; // everything in here is wiped out
+    explode(c.x,c.y,KZ,X.F);
+    for(const p of allP){if(p.body.dead||p.pinned)continue;const dx=p.x-c.x,dy=p.y-c.y,d=Math.hypot(dx,dy)||1;if(d<X.R){const k=1-d/X.R;addVel(p,dx/d*X.F*.75*k,dy/d*X.F*.75*k-9*k)}}
     for(const o of bodies){if(o.dead)continue;const q=centroid(o),d=Math.hypot(q.x-c.x,q.y-c.y);if(d>X.R)continue;const k=1-d/X.R;
-      if(o.type==='bird'&&o.alive&&d>X.R*.45)hurt(o,k*90,true);if(o.type==='animal'&&o.alive)hurtAnimal(o,k*120);if(Math.random()<k)ignite(o)}
-    igniteNear(c.x,c.y,X.R*.6,.7);
-    flash=Math.max(flash,1);shake=Math.max(shake,40);
-    fx.push({t:'flash',x:c.x,y:c.y,r:X.R*1.4,life:1});
-    for(let i=0;i<60;i++)fx.push({t:'smoke',x:c.x+rand(-120,120),y:c.y+rand(-60,20),vx:rand(-5,5),vy:rand(-6,-1),life:1,s:rand(24,50),col:'rgba(80,70,60,.55)'});
-    for(let i=0;i<80;i++){const a=rand(0,TAU),v=rand(6,18);fx.push({t:'spark',x:c.x,y:c.y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,life:1.2,col:i%3?'#ffd23f':'#ff5a1f',big:1})}
-    for(let i=0;i<4;i++){noise(1.6,1,300+i*120,'lowpass',c.x,1,i*.15)}tone('sine',70,25,2.5,.6,null,c.x);
-    fx.push({t:'mushroom',x:c.x,y:groundY,life:1,s:1});toast('☢️ KABOOM!');return}
+      if(d<KZ){if(o.type==='bird'&&o.alive){feathers(o,20);die(o)}else if(o.type==='animal'&&o.alive){hurtAnimal(o,99999)}
+        else if(o.type==='melon')breakMelon(o);else if(o.type==='glass')shatterGlass(o);else if(o.type==='crate')breakCrate(o);else if(o.type==='balloon')popBalloon(o);
+        else if((o.type==='tnt'||o.type==='bomb')&&!o.fuse)o.fuse=10}
+      else{if(o.type==='bird'&&o.alive)hurt(o,k*320,true);if(o.type==='animal'&&o.alive)hurtAnimal(o,k*380)}
+      if(Math.random()<k*1.3)ignite(o)}
+    igniteNear(c.x,c.y,X.R*.75,.9);
+    flash=Math.max(flash,1.6);shake=Math.max(shake,70);
+    fx.push({t:'flash',x:c.x,y:c.y,r:X.R*1.6,life:1});
+    fx.push({t:'shock',x:c.x,y:c.y,R:X.R*1.15,life:1});fx.push({t:'shock',x:c.x,y:c.y,R:X.R*.7,life:1});
+    for(let i=0;i<140;i++)fx.push({t:'smoke',x:c.x+rand(-300,300),y:c.y+rand(-120,30),vx:rand(-9,9),vy:rand(-9,-1),life:1,s:rand(40,90),col:'rgba(80,70,60,.55)'});
+    for(let i=0;i<160;i++){const a=rand(0,TAU),v=rand(8,28);fx.push({t:'spark',x:c.x,y:c.y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,life:1.4,col:i%3?'#ffd23f':'#ff5a1f',big:1})}
+    for(let i=0;i<6;i++){noise(2.4,1,220+i*110,'lowpass',c.x,1,i*.18)}tone('sine',60,20,3.5,.8,null,c.x);tone('sawtooth',90,30,2,.25,300,c.x,.1);
+    fx.push({t:'mushroom',x:c.x,y:terrainOn?gAt(c.x):groundY,life:1,s:2.6});toast('☢️ KABOOM!');return}
   explode(c.x,c.y,X.R,X.F);
   if(X.cluster)for(let i=0;i<8;i++){const a=-Math.PI/2+rand(-1.2,1.2),v=rand(6,12);const m=add(single('xpl',c.x,c.y-6,6,{rest:.4,fric:.4,im:.9,dens:1.2},{kind:'bomblet',fuse:rand(40,90),lit:true}));addVel(m.ps[0],Math.cos(a)*v,Math.sin(a)*v)}
 }
