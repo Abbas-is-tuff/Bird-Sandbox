@@ -4006,24 +4006,26 @@ function fireGun(b){
   if(!g.water&&!g.nerf){fx.push({t:'muzzle',x:mx,y:my,a:Math.atan2(uy,ux),s:g.dmg>=30||g.pellets?1.4:g.laser?.8:1,col:g.laser||'#ffd23f',life:1});
     if(!g.laser&&!g.rocket)fx.push({t:'shell',x:b.ps[Math.min(1,b.ps.length-1)].x,y:b.ps[1].y,vx:-uy*rand(1,2)-ux,vy:-rand(2,3.5),rot:0,vr:rand(-.4,.4),life:1})}
   // recoil
-  for(const p of b.ps)addVel(p,-ux*g.kick*.35,-uy*g.kick*.35);
-  const nx=-uy,ny=ux,up=(ny<0?1:-1);addVel(m,nx*up*g.kick*.4,ny*up*g.kick*.4);
+  if(b.holder){b.kickA=-(Math.cos(b.hAng||0)>=0?1:-1)*g.kick*.012;for(const p of b.holder.ps)addVel(p,-ux*g.kick*.05,0)}
+  else{for(const p of b.ps)addVel(p,-ux*g.kick*.35,-uy*g.kick*.35);
+  const nx=-uy,ny=ux,up=(ny<0?1:-1);addVel(m,nx*up*g.kick*.4,ny*up*g.kick*.4)}
 }
 function gunUpdate(dt){
   const sec=dt/60;
   for(const b of bodies){if(b.type!=='gun'||b.dead)continue;const g=GUNS[b.kind],ps=b.ps,grip=ps[0];
     b.cd=Math.max(0,b.cd-dt);b.dropT=Math.max(0,b.dropT-sec);
-    if(b.firing&&g.auto)fireGun(b);
+    if(b.firing&&g.auto&&(!b.holder||frameNo%6||clearShot(b)))fireGun(b);
     const h=b.holder;
-    if(h&&(h.dead||!h.alive||!bodies.includes(h)||b.dragT||h.frozenT>0)){b.holder=null;b.dropT=2;b.firing=false}
+    if(h&&(h.dead||!h.alive||!bodies.includes(h)||b.dragT||h.frozenT>0)){b.holder=null;b.dropT=2;b.firing=false;b.hAng=undefined}
     else if(h){const hp=swordHand(h),f=h.f||1;const gx=hp.x+f*3,gy=hp.y+3;
-      for(const p of [ps[0],ps[1]]){p.x+=(gx-p.x)*.6;p.y+=(gy-p.y)*.6}
-      const {m}=gunDir(b),ang=Math.atan2(m.y-grip.y,m.x-grip.x),want=f>0?-.05:Math.PI+.05;let da=want-ang;while(da>Math.PI)da-=TAU;while(da<-Math.PI)da+=TAU;
-      const L=Math.hypot(m.x-grip.x,m.y-grip.y)||1,nx=-(m.y-grip.y)/L,ny=(m.x-grip.x)/L;
-      for(let i=1;i<ps.length;i++){const k=(i/ps.length)*da*.25*dt;addVel(ps[i],nx*k*L*.1,ny*k*L*.1)}
-      for(const p of h.ps)addVel(p,0,-G*.08*dt*(g.heavy?1:.3));
+      // held firmly in the beak/paws: no weight, aimed where the holder looks (or at whoever they're mad at)
+      let want=f>0?-.05:Math.PI+.05;const foe=h.foe&&h.foe.alive?h.foe:null;if(foe){const q=cPos(foe);want=Math.atan2(q.y-gy,q.x-gx);h.f=q.x>gx?1:-1}
+      if(b.hAng===undefined)b.hAng=Math.atan2(ps[ps.length-1].y-grip.y,ps[ps.length-1].x-grip.x);
+      let da=want-b.hAng;while(da>Math.PI)da-=TAU;while(da<-Math.PI)da+=TAU;b.hAng+=da*Math.min(1,.15*dt)+(b.kickA||0);b.kickA=(b.kickA||0)*.8;
+      const cs=Math.cos(b.hAng),sn=Math.sin(b.hAng),sp=11,[hvx,hvy]=[hp.x-(hp.px??hp.x),hp.y-(hp.py??hp.y)];
+      ps.forEach((p,i)=>{p.x=gx+cs*sp*i;p.y=gy+sn*sp*i;p.px=p.x-hvx;p.py=p.y-hvy});
       b.shootT-=sec;
-      if(b.shootT<=0&&h.stun<=0){if(g.auto){b.firing=!b.firing;b.shootT=b.firing?rand(.25,.7):rand(2,4.5)}else{fireGun(b);b.shootT=rand(1,2.8)}}
+      if(b.shootT<=0&&h.stun<=0){if(!clearShot(b)){b.firing=false;b.shootT=rand(.3,.8)}else if(g.auto){b.firing=!b.firing;b.shootT=b.firing?rand(.25,.7):rand(2,4.5)}else{fireGun(b);b.shootT=rand(1,2.8)}}
     }
     else if(b.dropT<=0&&!b.dragT){
       for(const o of bodies){if((o.type!=='bird'&&o.type!=='animal')||!o.alive||o.dragT||o.stun>0)continue;const hp=swordHand(o);if(!hp)continue;
@@ -4033,6 +4035,11 @@ function gunUpdate(dt){
   }
   xplUpdate(dt);gunUI();
 }
+// don't shoot friends: only fire when nobody but a foe is in the way
+function clearShot(b){const g=GUNS[b.kind],h=b.holder;if(!h)return true;const {ux,uy,m}=gunDir(b);const skip=new Set([b,h]);
+  const r=rayHit(m.x,m.y,ux,uy,g.rocket?900:Math.min(g.range||600,1200),skip);if(!r.p)return true;const o=r.p.body;
+  if(o.type==='bird'||o.type==='animal'){return o===h.foe}
+  if(g.rocket&&r.t<200)return false;return true}
 function gunActivate(b){
   if(b.type==='gun'){setGun(b);const g=GUNS[b.kind];if(b.holder){const h=b.holder;b.holder=null;b.dropT=3;b.firing=false;toast((h.name||h.def.name||h.def.n)+' dropped the '+g.n.toLowerCase());return true}
     if(g.auto){b.firing=!b.firing;if(b.firing)fireGun(b)}else fireGun(b);return true}
