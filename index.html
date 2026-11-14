@@ -667,15 +667,16 @@ function step(dt,sub){
       for(const p of b.ps){const vx=(p.x-p.px)/dt,vy=(p.y-p.py)/dt,dv=Math.hypot(vx-p.lvx,vy-p.lvy);p.lvx=vx;p.lvy=vy;const pt=b.part.get(p);if(p!==b.Bk&&dv>mx[pt])mx[pt]=dv}
       if(b.frozenT>0){if(!fresh&&!bounced&&!b.dragT&&Math.max(mx.head,mx.body,mx.wing,mx.leg1,mx.leg2)>17)unfreeze(b,true)}
       else if(!fresh&&!bounced){
-        if(b.att.wing&&((!b.dragT&&mx.wing>36)||Math.hypot(b.E.x-b.U.x,b.E.y-b.U.y)>b.wJ.len*1.9))breakLimb(b,'wing');
-        if(b.att.leg1&&((!b.dragT&&mx.leg1>36)||Math.hypot(b.K1.x-b.L.x,b.K1.y-b.L.y)>b.l1J.len*2))breakLimb(b,'leg1');
-        if(b.att.leg2&&((!b.dragT&&mx.leg2>36)||Math.hypot(b.K2.x-b.L.x,b.K2.y-b.L.y)>b.l2J.len*2))breakLimb(b,'leg2');
+        if(b.att.wing&&((!b.dragT&&mx.wing>36)||Math.hypot(b.E.x-b.U.x,b.E.y-b.U.y)>jl(b,'wing')*1.9))breakLimb(b,'wing');
+        if(b.att.leg1&&((!b.dragT&&mx.leg1>36)||Math.hypot(b.K1.x-b.L.x,b.K1.y-b.L.y)>jl(b,'leg1')*2))breakLimb(b,'leg1');
+        if(b.att.leg2&&((!b.dragT&&mx.leg2>36)||Math.hypot(b.K2.x-b.L.x,b.K2.y-b.L.y)>jl(b,'leg2')*2))breakLimb(b,'leg2');
+        injuryCheck(b,mx);
         b.crush=crushNow;b.press=pressNow;
         if(!b.dragT){
           const thr=11;
           const d=Math.max(0,mx.head-thr)*2.4+Math.max(0,mx.body-thr)*1.6+(Math.max(0,mx.wing-thr)+Math.max(0,mx.leg1-thr)+Math.max(0,mx.leg2-thr))*.4;
           const bk=frameNo-(b.aBumpF??-99)<4?.06:frameNo-(b.bumpF??-99)<3?.3:1;
-          if(bk===1&&mx.head>34&&b.alive&&!(b.toughT>0))hurt(b,999);else if(d*bk>1.5)hurt(b,d*bk*(b.toughT>0?.3:1));
+          if(bk===1&&mx.head>50&&b.alive&&!(b.toughT>0))hurt(b,999);else if(d*bk>1.5)hurt(b,d*bk*(b.toughT>0?.3:1));
           if(b.crush>2){const c=b.crush;hurt(b,c,c<10);if(c>45)for(const limb of ['wing','leg1','leg2'])if(Math.random()<.35)breakLimb(b,limb)}
           if(b.press>.3&&(b.L.touch||b.U.touch)){hurt(b,b.press*.9*DT,true);if(Math.random()<.02)feathers(b,2)}
           if(d>1.5){b.sleep=false}
@@ -771,7 +772,8 @@ function birdCall(b,reply){
   b.callVis=.4;
   if(!reply)for(const o of bodies)if(o!==b&&o.type==='bird'&&o.alive&&!o.sleep&&o.replyT<=0&&Math.hypot(o.U.x-b.U.x,o.U.y-b.U.y)<380&&Math.random()<.55){o.replyT=rand(.35,1.1);o.f=b.U.x>o.U.x?1:-1}
 }
-function goalFly(b,x,y,kind,extra){if(terrainOn)y=Math.min(y,gAt(x)-30);b.goal=Object.assign({x,y,kind},extra);b.wp=null;b.flyT=6;b.act='fly';b.f=x>b.U.x?1:-1;b.getUpT=0}
+function badLeg(b,p){const I=b.inj&&b.inj[p];return I&&I.type!=='torn'}
+function goalFly(b,x,y,kind,extra){if(b.inj&&b.inj.wing){b.goal=null;b.flyT=0;b.act='walk';b.actT=1;b.f=x>b.U.x?1:-1;return}if(terrainOn)y=Math.min(y,gAt(x)-30);b.goal=Object.assign({x,y,kind},extra);b.wp=null;b.flyT=6;b.act='fly';b.f=x>b.U.x?1:-1;b.getUpT=0}
 function birdAI(b,dt){
   const sec=dt/60;
   b.stun=Math.max(0,b.stun-sec);b.hurtT-=sec;b.callVis=Math.max(0,(b.callVis||0)-sec);
@@ -779,7 +781,7 @@ function birdAI(b,dt){
   if(b.alive&&b.baby){b.growT=(b.growT??3)-sec;if(b.growT<=0){b.growT=3;scaleBody(b,1.03);if((b.scale||1)>=.995)b.baby=false}}
   if(b.shiverT>0){b.shiverT-=sec;if(Math.random()<.3*dt)addVel(b.U,rand(-.5,.5),0)}
   if(!b.alive)return;
-  const {U,L,H,Bk,E,Wt,F1,F2,K1,K2,s}=b,att=b.att,wingOK=att.wing&&b.wetT<=0&&!b.def.flightless,legs=(att.leg1?1:0)+(att.leg2?1:0);
+  const {U,L,H,Bk,E,Wt,F1,F2,K1,K2,s}=b,att=b.att,wingOK=att.wing&&b.wetT<=0&&!b.def.flightless&&!hasInj(b,'wing'),legs=(att.leg1&&!badLeg(b,'leg1')?1:0)+(att.leg2&&!badLeg(b,'leg2')?1:0);
   // blinking
   b.blinkT-=sec;b.blink-=sec;if(b.blinkT<0){b.blinkT=rand(1.5,5);b.blink=.13}
   b.wetT=Math.max(0,b.wetT-sec);
@@ -1119,6 +1121,7 @@ function die(b){
   fx.push({t:'text',x:b.H.x,y:b.H.y-30,vy:-.6,life:1,txt:'💀 '+birdName(b)});
 }
 function heal(b){
+  fixAllInj(b);
   b.health=100;b.alive=true;b.stun=0;b.hurtT=2;b.getUpT=0;b.fire=0;b.soot=0;
   for(let i=0;i<10;i++)fx.push({t:'spark',x:b.U.x+rand(-25,25),y:b.U.y+rand(-30,15),vx:0,vy:rand(-1.5,-.5),life:1,col:'#ffe36e'});
   fx.push({t:'heart',x:b.H.x,y:b.H.y-20,vy:-1,life:1});birdCall(b,true);
@@ -1649,7 +1652,7 @@ function render(){
   shadeBodies(ctx);
   for(const b of bodies)if(b.type==='bird')drawBird(ctx,b);
   for(const b of bodies)if(b.type==='balloon')drawBody(ctx,b);
-  drawSlings();drawFrozen();drawEmotions(ctx);
+  drawSlings();drawFrozen();drawInjuries(ctx);drawEmotions(ctx);
   for(const t of trees)drawLeaves(ctx,t,true);
   drawFish(ctx);
   // water (drawn over what's inside it)
@@ -2904,7 +2907,7 @@ function hurtAnimal(b,dmg){
   if(b.health<=0){b.health=0;b.alive=false;b.stun=0;fx.push({t:'ghost',x:b.Hd.x,y:b.Hd.y,vy:-.9,life:1,b});fx.push({t:'text',x:b.Hd.x,y:b.Hd.y-28,vy:-.6,life:1,txt:'💀 '+(b.name||b.def.n)});deathSound(b.def.voice,b.Hd.x);emoDeath(b)}
   else if(dmg>4){if(b.def.cat)hiss(b.Hd.x);else animalSound(b)}
 }
-function healAnimal(b){b.health=100;b.alive=true;b.stun=0;b.getUpT=0;b.fire=0;b.soot=0;fx.push({t:'heart',x:b.Hd.x,y:b.Hd.y-20,vy:-1,life:1});for(let i=0;i<8;i++)fx.push({t:'spark',x:b.C.x+rand(-20,20),y:b.C.y+rand(-20,10),vx:0,vy:rand(-1.5,-.5),life:1,col:'#ffe36e'});animalSound(b)}
+function healAnimal(b){fixAllInj(b);b.health=100;b.alive=true;b.stun=0;b.getUpT=0;b.fire=0;b.soot=0;fx.push({t:'heart',x:b.Hd.x,y:b.Hd.y-20,vy:-1,life:1});for(let i=0;i<8;i++)fx.push({t:'spark',x:b.C.x+rand(-20,20),y:b.C.y+rand(-20,10),vx:0,vy:rand(-1.5,-.5),life:1,col:'#ffe36e'});animalSound(b)}
 function animalJump(b,vx,vy){for(const p of b.ps)addVel(p,vx,-vy);if(okSnd('jmp',120))tone('sine',300,520,.08,.02,null,b.C.x)}
 function nearestOf(b,pred,maxD){let best=null,bd=maxD;for(const o of bodies){if(o===b||o.dead||!pred(o))continue;const q=o.type==='bird'?o.U:o.type==='animal'?o.C:o.ps[0];const d=Math.hypot(q.x-b.C.x,q.y-b.C.y);if(d<bd){bd=d;best=o}}return best}
 function animalAI(b,dt){
@@ -2913,14 +2916,15 @@ function animalAI(b,dt){
   b.blinkT-=sec;b.blink-=sec;if(b.blinkT<0){b.blinkT=rand(2,5);b.blink=.14}
   // yanked too hard: limbs snap off (just like the birds)
   if(frameNo-b.born>3){
-    if(att.legF&&(Math.hypot(FK.x-C.x,FK.y-C.y)>b.fJ.len*2.1||Math.hypot(FF.x-C.x,FF.y-C.y)>b.fJ.len*4.4))breakAnimalLimb(b,'legF');
-    if(att.legB&&(Math.hypot(BK.x-Hp.x,BK.y-Hp.y)>b.bJ.len*2.1||Math.hypot(BF.x-Hp.x,BF.y-Hp.y)>b.bJ.len*4.4))breakAnimalLimb(b,'legB');
-    if(att.tail&&Math.hypot(T1.x-Hp.x,T1.y-Hp.y)>b.tJ.len*2.4)breakAnimalLimb(b,'tail');
+    if(att.legF&&(Math.hypot(FK.x-C.x,FK.y-C.y)>jl(b,'legF')*2.1||Math.hypot(FF.x-C.x,FF.y-C.y)>jl(b,'legF')*4.4))breakAnimalLimb(b,'legF');
+    if(att.legB&&(Math.hypot(BK.x-Hp.x,BK.y-Hp.y)>jl(b,'legB')*2.1||Math.hypot(BF.x-Hp.x,BF.y-Hp.y)>jl(b,'legB')*4.4))breakAnimalLimb(b,'legB');
+    if(att.tail&&Math.hypot(T1.x-Hp.x,T1.y-Hp.y)>jl(b,'tail')*2.4)breakAnimalLimb(b,'tail');
+    if(b.dragT)injuryCheck(b,null);
   }
   if(!b.alive||b.frozenT>0)return;
   if(b.dragT){if(d.cat&&Math.random()<.01*dt)meow(b);if(d.turtle||d.curl)b.shell=1.5;b.act='idle';b.actT=.5;
     addVel(FF,0,.15*dt);addVel(BF,0,.15*dt);return} // legs dangle
-  const dn=G<0?-1:1,f=b.f,legs=(att.legF?1:0)+(att.legB?1:0);
+  const dn=G<0?-1:1,f=b.f,legs=(att.legF&&!badLeg(b,'legF')?1:0)+(att.legB&&!badLeg(b,'legB')?1:0);
   const grounded=(att.legF&&(FF.touch||FK.touch))||(att.legB&&(BF.touch||BK.touch))||C.touch||Hp.touch||Hd.touch;
   const inWater=C.sub>.25||Hp.sub>.25;
   // tail swish
@@ -3053,9 +3057,10 @@ function pickAnimalAct(b){
 function animalImpact(b,m){
   if(!b.alive||b.dragT)return;
   const bk=frameNo-(b.bumpF??-99)<3?.3:1;
-  let mh=0,mb=0;for(const p of b.ps){const dv=Math.hypot((p.x-p.px)/DT-(p.lvx0??0),(p.y-p.py)/DT-(p.lvy0??0));p.lvx0=(p.x-p.px)/DT;p.lvy0=(p.y-p.py)/DT;const pt=b.part.get(p);if(pt==='head'&&dv>mh)mh=dv;else if(pt==='body'&&dv>mb)mb=dv}
+  let mh=0,mb=0;const mxA={legF:0,legB:0,tail:0};for(const p of b.ps){const dv=Math.hypot((p.x-p.px)/DT-(p.lvx0??0),(p.y-p.py)/DT-(p.lvy0??0));p.lvx0=(p.x-p.px)/DT;p.lvy0=(p.y-p.py)/DT;const pt=b.part.get(p);if(pt==='head'&&dv>mh)mh=dv;else if(pt==='body'&&dv>mb)mb=dv;else if(pt in mxA&&dv>mxA[pt])mxA[pt]=dv}
+  if(bk===1)injuryCheck(b,mxA);
   const thr=b.def.cat?20:b.def.turtle?24:15,sh=(b.def.turtle||b.def.curl)&&b.shell>0?.3:1;
-  if(mh>40&&bk===1)hurtAnimal(b,999);
+  if(mh>55&&bk===1)hurtAnimal(b,999);
   else{const dmg=(Math.max(0,mh-thr)*2.4+Math.max(0,mb-thr)*1.8)*sh*bk;if(dmg>1.5)hurtAnimal(b,dmg)}
   if(m>38){if(b.att.legF&&Math.random()<.3)breakAnimalLimb(b,'legF');if(b.att.legB&&Math.random()<.3)breakAnimalLimb(b,'legB')}
 }
@@ -4808,6 +4813,7 @@ function emotionUpdate(dt){
   const sec=dt/60;emoClock+=sec;const tick=emoClock>=.25;if(tick){emoClock=0;scanDangers()}
   for(const b of bodies){if(!isCreature(b))continue;const e=emo(b);if(b.emoT>0)b.emoT-=sec;if(!b.alive){continue}
     if(b.peckT>0)b.peckT-=sec;
+    if(b.inj)injuryHeal(b,sec);
     // running away / charging: keep pushing every frame
     if(b.runT>0){b.runT-=sec;if(!busy(b)){const ps=b.type==='bird'?[b.U,b.L,b.H]:[b.C,b.Hp,b.Hd];if(b.type==='animal'&&b.act!=='walk'&&b.act!=='pounce'){b.act='walk';b.actT=.5}const top=b.type==='bird'?Math.max(2.6,(b.def.run||1)*2.4)*Math.max(.8,Math.min(1.6,b.s||1)):(b.def.spd||1.5)*Math.max(1,b.s||1)*1.7;
       const[vx]=vel(ps[0]);for(const p of ps)addVel(p,(b.runDir*top-vx)*.08*dt,0);b.f=b.runDir}}
@@ -4875,10 +4881,77 @@ function drawEmotions(c){
 function moodHTML(b){
   const e=emo(b),bar=(n,v,col)=>'<div style="display:flex;align-items:center;gap:6px;font-size:12px"><span style="width:86px">'+n+'</span><div style="flex:1;height:7px;background:#2a3446;border-radius:4px"><div style="width:'+Math.round(clamp(v,0,1)*100)+'%;height:100%;background:'+col+';border-radius:4px"></div></div></div>';
   const T=b.tr,trait=[T.emp>.65?'caring 💞':T.emp<.25?'cold 🧊':'',T.brave>.65?'brave 🦁':T.brave<.25?'timid 🐭':'',T.temper>.65?'hot-headed 🔥':T.temper<.2?'chill 😌':''].filter(Boolean).join(' · ')||'easy-going';
-  return '<div style="margin-top:6px;color:#9fb3cf">Feelings</div>'+bar('😊 Happy',e.hap,'#ffd23f')+bar('😌 Satisfied',e.sat,'#8ac926')+bar('😎 Confident',e.conf,'#4cc9f0')+bar('😨 Scared',e.fear,'#b388ff')+bar('😠 Angry',e.anger,'#ff595e')+bar('😢 Sad',e.sad,'#5a8dee')+bar('🥰 Loved',e.love,'#ff7eb6')+
+  return injHTML(b)+'<div style="margin-top:6px;color:#9fb3cf">Feelings</div>'+bar('😊 Happy',e.hap,'#ffd23f')+bar('😌 Satisfied',e.sat,'#8ac926')+bar('😎 Confident',e.conf,'#4cc9f0')+bar('😨 Scared',e.fear,'#b388ff')+bar('😠 Angry',e.anger,'#ff595e')+bar('😢 Sad',e.sad,'#5a8dee')+bar('🥰 Loved',e.love,'#ff7eb6')+
     '<div style="font-size:12px;margin-top:3px">Personality: '+trait+'</div>'+(b.foe&&b.foe.alive?'<div style="font-size:12px">😠 Mad at '+cName(b.foe)+'</div>':'')+(b.helping?'<div style="font-size:12px">🤗 Helping '+cName(b.helping)+'</div>':'')+(b.mourn?'<div style="font-size:12px">💔 Missing '+cName(b.mourn)+'</div>':'');
 }
 
+/* =================== INJURIES: broken bones, torn ligaments, dislocated joints =================== */
+const INJ={broken:{n:'Broken bone',ic:'🦴',t:75,verb:'broke'},torn:{n:'Torn ligament',ic:'🩹',t:45,verb:'tore a ligament in'},disl:{n:'Dislocated joint',ic:'💢',t:30,verb:'dislocated'}};
+const PART_NAME={wing:'wing',leg1:'leg',leg2:'other leg',legF:'front leg',legB:'back leg',tail:'tail'};
+function injJoint(b,part){return b.type==='bird'?(part==='wing'?b.wJ:part==='leg1'?b.l1J:b.l2J):(part==='legF'?b.fJ:part==='legB'?b.bJ:b.tJ)}
+function injKnee(b,part){return b.type==='bird'?(part==='wing'?b.E:part==='leg1'?b.K1:b.K2):(part==='legF'?b.FK:part==='legB'?b.BK:b.T1)}
+function hasInj(b,part){return b.inj&&b.inj[part]}
+function injure(b,part,type){
+  if(!b.att||!b.att[part]||b.dead)return;b.inj=b.inj||{};
+  const cur=b.inj[part],rank={disl:1,torn:2,broken:3};if(cur&&rank[cur.type]>=rank[type])return;
+  if(cur)fixInj(b,part,true);
+  const J=injJoint(b,part);if(!J)return;const I={type:type,t:INJ[type].t*rand(.8,1.25)};
+  I.len0=J.len;I.k0=J.k;
+  if(type==='disl')J.len*=1.45;
+  if(type==='torn')J.k*=.3;
+  if(type==='broken'){J.k*=.5;J.len*=1.12}
+  b.inj[part]=I;
+  const q=injKnee(b,part)||cPos(b);
+  // cartoon crack / pop sound
+  if(type==='broken'){noise(.08,.5,3500,'highpass',q.x,1);tone('square',900,200,.08,.06,null,q.x)}
+  else if(type==='disl'){tone('sine',300,900,.07,.07,null,q.x);tone('sine',200,120,.08,.05,null,q.x,.06)}
+  else{tone('sawtooth',500,250,.18,.04,600,q.x)}
+  for(let i=0;i<6;i++)fx.push({t:'star',x:q.x,y:q.y,vx:rand(-2,2),vy:rand(-3,-.5),life:.7});
+  fx.push({t:'text',x:q.x,y:q.y-34,vy:-.6,life:1.6,txt:INJ[type].ic+' '+cName(b)+' '+INJ[type].verb+' '+(type==='broken'?'a':'their')+' '+PART_NAME[part]+'!'});
+  if(b.type==='bird'){if(b.alive){hurt(b,type==='broken'?14:8,true);b.stun=Math.max(b.stun,1)}if(part==='wing'&&b.flyT>0){b.flyT=0;b.goal=null}}
+  else if(b.alive)hurtAnimal(b,type==='broken'?14:8);
+  if(b.alive){const e=emo(b);e.fear=Math.min(1,e.fear+.25);e.sad=Math.min(1,e.sad+.2);e.hap=Math.max(0,e.hap-.2);feel(b,'🤕',2.5)}
+}
+function fixInj(b,part,silent){
+  const I=b.inj&&b.inj[part];if(!I)return;const J=injJoint(b,part);if(J){J.len=I.len0;J.k=I.k0}delete b.inj[part];
+  if(!silent&&b.alive){const q=injKnee(b,part)||cPos(b);fx.push({t:'text',x:q.x,y:q.y-30,vy:-.6,life:1.4,txt:(I.type==='disl'?'*pop* ':'')+'✨ '+cName(b)+"'s "+PART_NAME[part]+' is better!'});
+    if(I.type==='disl')tone('sine',500,1000,.06,.06,null,q.x);feel(b,EMO_ICON.happy,2);const e=emo(b);e.hap=Math.min(1,e.hap+.2)}
+}
+function fixAllInj(b){if(b.inj)for(const p of Object.keys(b.inj))fixInj(b,p,true);b.inj={}}
+// impacts & yanks -> injuries (called every step)
+function injuryCheck(b,mx){
+  if(b.dead||!b.att||frameNo-b.born<10)return;
+  const limbs=b.type==='bird'?['wing','leg1','leg2']:['legF','legB','tail'];
+  for(const part of limbs){if(!b.att[part])continue;
+    const v=mx?mx[part]||0:0;
+    if(!b.dragT&&v>22&&!(b.toughT>0)){const r=Math.random(),c=(v-22)/16;
+      if(r<c*.35)injure(b,part,v>29&&part!=='tail'?'broken':Math.random()<.5?'torn':'disl')}
+    const J=injJoint(b,part);if(!J)continue;const L0=(b.inj&&b.inj[part]?b.inj[part].len0:J.len),d=Math.hypot(J.a.x-J.b.x,J.a.y-J.b.y);
+    if(d>L0*1.75&&Math.random()<.25)injure(b,part,'torn');
+    else if(d>L0*1.5&&Math.random()<.2)injure(b,part,'disl');
+  }
+}
+function injuryHeal(b,sec){
+  if(!b.inj||!b.alive)return;
+  const helped=bodies.some(o=>o.helping===b&&isCreature(o)&&Math.hypot(cPos(o).x-cPos(b).x,cPos(o).y-cPos(b).y)<120);
+  for(const part of Object.keys(b.inj)){const I=b.inj[part];I.t-=sec*(helped?3:1)*(b.sleep||b.act==='sleep'?1.6:1);
+    if(I.type==='disl'&&Math.random()<.0008&&b.dragT)I.t=0; // sometimes it pops back in when you move them
+    if(I.t<=0)fixInj(b,part)}
+  // limping: an injured creature now and then winces
+  if(Math.random()<.004&&Object.keys(b.inj).length)feel(b,'🤕',1.2);
+}
+function drawInjuries(c){
+  c.font='12px system-ui';c.textAlign='center';c.textBaseline='middle';
+  for(const b of bodies){if(!b.inj||b.dead||!(b.type==='bird'||b.type==='animal'))continue;
+    for(const part of Object.keys(b.inj)){const q=injKnee(b,part);if(!q)continue;const I=b.inj[part];
+      if(I.type==='torn'){c.strokeStyle='rgba(255,80,80,'+(.5+.3*Math.sin(simTime*6))+')';c.lineWidth=2;c.beginPath();c.arc(q.x,q.y,7*(b.s||1),0,TAU);c.stroke()}
+      else if(I.type==='broken'){c.strokeStyle='#fff';c.lineWidth=2;c.beginPath();c.moveTo(q.x-5,q.y-4);c.lineTo(q.x-1,q.y);c.lineTo(q.x-3,q.y+2);c.lineTo(q.x+4,q.y+5);c.stroke()}
+      c.fillText(INJ[I.type].ic,q.x+8,q.y-8)}}
+}
+function injHTML(b){if(!b.inj||!Object.keys(b.inj).length)return '';
+  return '<div style="margin-top:6px;color:#ff9a8a">Injuries</div>'+Object.entries(b.inj).map(([p,I])=>'<div style="font-size:12px">'+INJ[I.type].ic+' '+INJ[I.type].n+' — '+PART_NAME[p]+' <span style="color:#9fb3cf">(heals in ~'+Math.max(1,Math.ceil(I.t))+'s'+(I.type==='disl'?' or tap 💉':'')+')</span></div>').join('')}
+
+function jl(b,part){const I=b.inj&&b.inj[part];return I?I.len0:injJoint(b,part).len}
 /* =================== UNDO =================== */
 const undoStack=[];
 function pushUndo(){
@@ -5105,7 +5178,7 @@ const TOOLS=[
   {id:'scale',ic:'↕️',n:'Resize',h:'Drag up on anything to make it <b>bigger</b>, down for smaller — from 10% up to 1500%! Works on slingshots too'},
   {id:'tie',ic:'🪢',n:'Rope',h:'<b>Rope</b>: tap one thing, then another (or empty sky)'},
   {id:'pin',ic:'📌',n:'Pin',h:'Tap to <b>pin</b> / unpin a part in the air'},
-  {id:'heal',ic:'💉',n:'Revive',h:'Tap a bird to <b>revive</b> and heal it (lost limbs stay lost!)'},
+  {id:'heal',ic:'💉',n:'Revive',h:'Tap a bird or animal to <b>revive</b> and heal it — also fixes broken bones 🦴, torn ligaments 🩹 and dislocated joints 💢 (lost limbs stay lost!)'},
   {id:'delete',ic:'🗑️',n:'Delete',h:'Tap something to <b>delete</b> it (trees, ponds, walls too)'},
 ];
 const POWERS=[
