@@ -1637,7 +1637,7 @@ function render(){
   for(const pd of ponds){ctx.fillStyle=mix('#1c140b','#4e3620',light);ctx.fillRect(pd.x,groundY,pd.w,pd.d+20);ctx.fillStyle=mix('#25190e','#5a3e25',light);ctx.fillRect(pd.x,groundY+pd.d,pd.w,20)}
   // walls
   for(const w of walls){
-    if(w.trunk||w.pole||w.feederTray||w.lampCap||w.plant||w.built)continue;
+    if(w.trunk||w.pole||w.feederTray||w.lampCap||w.plant||w.built||w.statue)continue;
     if(w.conv){ctx.fillStyle='#2b2d33';rr(ctx,w.x,w.y,w.w,w.h,7);ctx.fill();ctx.strokeStyle='#ffd23f';ctx.lineWidth=2;const off=((simTime*60*w.dir)%16+16)%16;ctx.beginPath();for(let xx=w.x+off;xx<w.x+w.w-8;xx+=16){if(xx<w.x+8)continue;ctx.moveTo(xx-3*w.dir,w.y+3);ctx.lineTo(xx+3*w.dir,w.y+7);ctx.lineTo(xx-3*w.dir,w.y+11)}ctx.stroke();ctx.fillStyle='#666';circle(ctx,w.x+7,w.y+7,5);circle(ctx,w.x+w.w-7,w.y+7,5);continue}
     if(w.key!==undefined){ctx.fillStyle=w.lit>0?mix('#fafafa','#ffd23f',w.lit):'#fafafa';rr(ctx,w.x,w.y,w.w,w.h,3);ctx.fill();ctx.strokeStyle='#333';ctx.lineWidth=1.5;ctx.stroke();w.lit=Math.max(0,(w.lit||0)-.04);continue}
     if(w.roof){if(snowCover>.05){ctx.fillStyle=mix('#7c8aa6','#f4f8ff',light);ctx.fillRect(w.x,w.y-snowCover*5,w.w,snowCover*6)}continue}
@@ -1647,6 +1647,7 @@ function render(){
     if(w.h<w.w){ctx.fillStyle=grass;rr(ctx,w.x,w.y,w.w,Math.min(7,w.h),4);ctx.fill()}
     if(snowCover>.05){ctx.fillStyle=mix('#7c8aa6','#f4f8ff',light);rr(ctx,w.x-1,w.y-snowCover*5,w.w+2,snowCover*6+1,3);ctx.fill()}
   }
+  drawStatues(ctx);
   // contact shadows (soft, fade with height above ground)
   ctx.fillStyle='rgba(0,0,0,.2)';const [SX0,SY]=sunPos(),SX=VX0+SX0/cam.z;
   for(const b of bodies){if(b.type==='branch'||b.type==='anchor'||b.type==='balloon')continue;const c=centroid(b);const hgt=groundY-c.y;if(hgt<0||hgt>260||pondAt(c.x))continue;const a=1-hgt/260;ctx.globalAlpha=a*light;ctx.beginPath();ctx.ellipse(c.x+clamp((c.x-SX)/(groundY-SY+80),-1.5,1.5)*hgt*.8,groundY+2,(b.type==='bird'?16*b.s:22)*(.6+.4*a),3.5,0,0,TAU);ctx.fill()}
@@ -3557,7 +3558,7 @@ function loadMap(id,silent){
   if(!MAPS[id])id='meadow';
   pushUndo();
   // wipe the world (same as 🧹 Clear)
-  butterflies=[];plants=[];bubbles=[];xform=null;inspected=null;houses=[];mirrors=[];feeders=[];lamps=[];sprinklers=[];slings=[];aaSites=[];interceptors=[];portals=[];portalPending=null;holes=[];tornados=[];waterDrops=[];quakeT=0;holdTool=null;
+  butterflies=[];plants=[];bubbles=[];xform=null;inspected=null;houses=[];mirrors=[];feeders=[];lamps=[];sprinklers=[];slings=[];aaSites=[];statues=[];interceptors=[];portals=[];portalPending=null;holes=[];tornados=[];waterDrops=[];quakeT=0;holdTool=null;
   bodies=[];ropes=[];walls=[];ponds=[];trees=[];fx=[];drags.clear();tieA=null;allP=[];pairs=[];
   MAP=MAPS[id];MAPID=id;rainbow=0;prevWeather=MAP.weather;cam={x:0,y:0,z:1};camFollow=null;sendSel=null;genChunks=new Set();updView();
   S.weather=MAP.weather;S.grav=MAP.grav;setTime(MAP.time);snowCover=id==='snow'?.9:0;
@@ -3791,6 +3792,7 @@ BIRDS.push({name:'Kauaʻi ʻŌʻō',s:.8,bk:1.6,body:'#1e1c1a',belly:'#4a3a2e',w
 let pendingSpawn=null;
 function doSpawn(ps,withDrag){
   pendingSpawn=null;pushUndo();const x=ps.x,y=ps.y,id=ps.id;
+  if(id==='statue'){makeStatue(x,surfaceAt(x,y));tone('sine',880,1320,.4,.08,null,x);return}
   if(id==='aa'){if(aaSites.length<50){makeAA(x,surfaceAt(x,y));tone('square',200,400,.2,.05,null,x)}else toast('🛡️ Max 50 air defenses');return}
   if(id.startsWith('sling:')){const z=SLING_SIZES.find(a=>'sling:'+a[0]===id);slingSc=z?z[2]:1;spawn('sling',x,y);slingSc=1;return}
   if(id==='tree'||id==='house'||id==='lamp'||id==='feeder'||id==='sling'||id==='mirror'||id==='sprinkler'){spawn(id,x,y);return}
@@ -5079,6 +5081,49 @@ function drawAA(c){
     c.fillStyle='#ffb347';c.beginPath();c.moveTo(-9,-2);c.lineTo(-15-Math.random()*5,0);c.lineTo(-9,2);c.fill();c.restore()}
 }
 
+/* =================== GOLDEN ABBAS STATUE =================== */
+var statues=[];
+function makeStatue(x,base){const q={x,base};statues.push(q);
+  walls.push({x:x-38,y:base-48,w:76,h:48,statue:q}); // stone pedestal: solid, things land on it
+  walls.push({x:x-12,y:base-48-102,w:30,h:6,statue:q,bgTree:true,ptop:true}); // top of his head: birds can perch
+  for(let i=0;i<14;i++)fx.push({t:'spark',x:x+rand(-30,30),y:base-rand(40,190),vx:rand(-1.5,1.5),vy:rand(-2,0),life:.9,col:i%2?'#ffd23f':'#fff3b0'});
+  return q}
+function drawStatues(c){
+  for(const q of statues){const x=q.x,b=q.base,top=b-48;
+    // pedestal
+    const pg=c.createLinearGradient(x-38,0,x+38,0);pg.addColorStop(0,'#6d6a66');pg.addColorStop(.5,'#a9a49c');pg.addColorStop(1,'#5e5b57');
+    c.fillStyle=pg;rr(c,x-38,top,76,48,4);c.fill();c.fillStyle='#8c877f';rr(c,x-44,b-8,88,8,3);c.fill();rr(c,x-42,top-6,84,8,3);c.fill();
+    c.fillStyle='#e8c25a';rr(c,x-26,top+16,52,16,3);c.fill();c.fillStyle='#5a3d00';c.font='bold 11px system-ui,sans-serif';c.textAlign='center';c.textBaseline='middle';c.fillText('ABBAS',x,top+24.5);
+    // gold
+    const g=c.createLinearGradient(x-30,top-150,x+30,top);g.addColorStop(0,'#fff6c2');g.addColorStop(.35,'#ffd84a');g.addColorStop(.7,'#d9a514');g.addColorStop(1,'#9c7208');
+    const dark='#8a6508';c.fillStyle=g;c.strokeStyle=dark;c.lineWidth=1.6;c.lineJoin='round';
+    const bx=x,by=top-6;
+    // feet
+    c.beginPath();c.moveTo(bx-7,by-14);c.lineTo(bx-9,by);c.lineTo(bx-1,by);c.moveTo(bx+5,by-14);c.lineTo(bx+5,by);c.lineTo(bx+13,by);c.stroke();
+    // tail (lovebird: short, fanned)
+    c.beginPath();c.moveTo(bx-10,by-26);c.lineTo(bx-26,by-4);c.lineTo(bx-16,by-2);c.lineTo(bx-4,by-20);c.closePath();c.fill();c.stroke();
+    // body
+    c.beginPath();c.ellipse(bx,by-40,19,29,.12,0,TAU);c.fill();c.stroke();
+    // folded right wing
+    c.beginPath();c.moveTo(bx+8,by-58);c.quadraticCurveTo(bx+22,by-38,bx+10,by-14);c.quadraticCurveTo(bx+2,by-34,bx+8,by-58);c.fill();c.stroke();
+    // raised left wing pointing straight up at the sky
+    c.beginPath();c.moveTo(bx-14,by-56);c.quadraticCurveTo(bx-26,by-96,bx-18,by-150);c.lineTo(bx-12,by-158);c.lineTo(bx-8,by-148);c.quadraticCurveTo(bx-6,by-98,bx-4,by-60);c.closePath();c.fill();c.stroke();
+    c.strokeStyle='rgba(138,101,8,.6)';c.lineWidth=1;for(let i=1;i<4;i++){c.beginPath();c.moveTo(bx-15+i*2,by-62-i*4);c.lineTo(bx-17+i*2,by-120-i*6);c.stroke()}
+    c.strokeStyle=dark;c.lineWidth=1.6;
+    // head
+    c.fillStyle=g;c.beginPath();c.arc(bx+3,by-79,15,0,TAU);c.fill();c.stroke();
+    // hooked parrot beak, looking up
+    c.beginPath();c.moveTo(bx+14,by-86);c.quadraticCurveTo(bx+27,by-88,bx+25,by-75);c.quadraticCurveTo(bx+20,by-79,bx+15,by-76);c.closePath();c.fill();c.stroke();
+    // eye
+    c.fillStyle='#6b4b00';c.beginPath();c.arc(bx+7,by-83,2.4,0,TAU);c.fill();c.fillStyle='#fff8d0';c.beginPath();c.arc(bx+7.8,by-83.8,.9,0,TAU);c.fill();
+    // shine streak
+    c.strokeStyle='rgba(255,255,240,.7)';c.lineWidth=2.5;c.lineCap='round';c.beginPath();c.arc(bx-2,by-44,13,-2.6,-1.9);c.stroke();c.beginPath();c.arc(bx-1,by-82,9,-2.7,-1.9);c.stroke();c.lineCap='butt';
+    // twinkles
+    const tw=(simTime*1.3+x*.01)%3;if(tw<1){const sx=bx-12+Math.sin(x)*4,sy=by-150+tw*60,a=Math.sin(tw*Math.PI);c.fillStyle='rgba(255,255,220,'+a+')';c.beginPath();for(let k=0;k<4;k++){const an=k*Math.PI/2;c.lineTo(sx+Math.cos(an)*7*a,sy+Math.sin(an)*7*a);c.lineTo(sx+Math.cos(an+Math.PI/4)*1.8,sy+Math.sin(an+Math.PI/4)*1.8)}c.fill()}
+    c.lineWidth=1;
+  }
+}
+
 /* =================== UNDO =================== */
 const undoStack=[];
 function pushUndo(){
@@ -5177,6 +5222,7 @@ cv.addEventListener('pointerdown',e=>{
       const ri=ropes.findIndex(r=>distSeg(x,y,r.a,r.b)<14);if(ri>=0){ropes.splice(ri,1);pop(1.2,x);break}
       const sq=sprinklers.find(q=>Math.abs(x-q.x)<22&&y>(q.base??groundY)-40&&y<(q.base??groundY)+15);if(sq){sq.removed=true;sprinklers=sprinklers.filter(o=>o!==sq);pop(.7,x);break}
       const lp=lamps.find(l=>Math.abs(x-l.x)<20&&y>l.y-22&&y<(l.base??groundY));if(lp){walls=walls.filter(w=>w.lamp!==lp);lamps=lamps.filter(o=>o!==lp);pop(.7,x);break}
+      const stq=statues.find(q=>Math.abs(x-q.x)<45&&y>q.base-200&&y<q.base+4);if(stq){walls=walls.filter(w=>w.statue!==stq);statues=statues.filter(o=>o!==stq);pop(.7,x);break}
       const aq=aaSites.find(q=>Math.abs(x-q.x)<32&&y>q.base-60&&y<q.base+4);if(aq){aaSites=aaSites.filter(o=>o!==aq);pop(.7,x);break}
       const sl=slings.find(q=>Math.abs(x-q.x)<45*(q.sc||1)&&y>q.y-25*(q.sc||1)&&y<(q.base??groundY));if(sl){slings=slings.filter(o=>o!==sl);for(const d of drags.values())if(d.sling===sl)d.sling=null;pop(.7,x);break}
       const pti=portals.findIndex(pr=>Math.hypot(x-pr.a.x,y-pr.a.y)<30||Math.hypot(x-pr.b.x,y-pr.b.y)<30);if(pti>=0){portals.splice(pti,1);pop(.7,x);break}
@@ -5291,6 +5337,7 @@ const WORLD=[
   {id:'conveyor',ic:'⏩',n:'Conveyor',h:'<b>Conveyor belt</b> — ✨ Use flips its direction'},
   {id:'piano',ic:'🎹',n:'Piano',h:'<b>Piano floor</b> — plays notes when things land on it'},
   {id:'sprinkler',ic:'💦',n:'Sprinkler',h:'<b>Sprinkler</b> — birds bathe in it on warm days, puts out fires'},
+  {id:'statue',ic:'🗿',n:'Abbas statue',h:'<b>Golden statue of Abbas</b> pointing at the sky ✨ — birds can perch on his head'},
   {id:'lamp',ic:'💡',n:'Lamp post',h:'<b>Lamp post</b> — lights up at night, birds perch on top'},
   {id:'spikes',ic:'🔺',n:'Spikes',h:'<b>Spikes</b> — deadly if a bird lands on them'},
 ];
@@ -5399,7 +5446,7 @@ $('bWeather').onclick=()=>{unlockAudio();const o=['clear','rain','storm','snow',
 $('bNames').onclick=()=>{showNames=!showNames;$('bNames').classList.toggle('on',showNames)};
 // pick a landing spot that keeps clear of things you placed (air defenses, weapons, cars, buildings...) and of the other new birds
 function rainSpot(taken){
-  const stuff=[];for(const q of aaSites)stuff.push([q.x,90]);
+  const stuff=[];for(const q of aaSites)stuff.push([q.x,90]);for(const q of statues)stuff.push([q.x,90]);
   for(const o of bodies){if(o.dead||o.type==='bird'||o.type==='animal'||o.type==='branch')continue;let x=0;for(const p of o.ps)x+=p.x;stuff.push([x/o.ps.length,60])}
   for(const w of walls)stuff.push([w.x+w.w/2,w.w/2+40]);for(const h of houses||[])if(h&&h.x!=null)stuff.push([h.x,120]);
   let best=rand(VX0+60,VX1-60),bs=-1e9;
@@ -5411,7 +5458,7 @@ $('bRain').onclick=()=>{unlockAudio();pushUndo();const taken=[];for(let i=0;i<6;
 $('bHeal').onclick=()=>{unlockAudio();pushUndo();for(const b of bodies){if(b.type==='bird')heal(b);else if(b.type==='animal')healAnimal(b)}toast('Everyone revived 💉')};
 function saveWorld(){
   const idx=d=>BIRDS.indexOf(d);
-  const data={v:1,tod,S:{...S},walls:walls.filter(w=>!w.trunk&&!w.house&&!w.feeder&&!w.lamp).map(w=>({...w})),lamps:lamps.map(l=>({x:l.x,base:l.base})),sprinklers:sprinklers.map(q=>({x:q.x,base:q.base})),slings:slings.map(q=>({x:q.x,base:q.base,sc:q.sc||1})),portals:portals.map(pr=>({a:pr.a,b:pr.b})),mirrors:mirrors.map(m=>({x:m.x,base:m.base})),feeders:feeders.map(f=>({x:f.x,base:f.base})),ponds:ponds.map(p=>({x:p.x,w:p.w})),trees:trees.map(t=>({x:t.x,base:t.base})),houses:houses.map(h=>({x:h.x,base:h.base})),
+  const data={v:1,tod,S:{...S},walls:walls.filter(w=>!w.statue&&!w.trunk&&!w.house&&!w.feeder&&!w.lamp).map(w=>({...w})),lamps:lamps.map(l=>({x:l.x,base:l.base})),sprinklers:sprinklers.map(q=>({x:q.x,base:q.base})),slings:slings.map(q=>({x:q.x,base:q.base,sc:q.sc||1})),portals:portals.map(pr=>({a:pr.a,b:pr.b})),mirrors:mirrors.map(m=>({x:m.x,base:m.base})),feeders:feeders.map(f=>({x:f.x,base:f.base})),ponds:ponds.map(p=>({x:p.x,w:p.w})),trees:trees.map(t=>({x:t.x,base:t.base})),houses:houses.map(h=>({x:h.x,base:h.base})),
     bodies:bodies.concat(houses.flatMap(h=>h.occ)).filter(b=>!['branch','anchor','piece','shard','chunk','seed','bell','swing','meteor','pinata'].includes(b.type)).map(b=>{const c=centroid(b);
       const id=b.type==='egg'?'egg:'+b.defIdx:b.type==='bird'?'bird:'+idx(b.def):b.type==='furn'?b.kind:b.type==='plank'&&b.cols<8?null:b.type==='seesaw'?'seesaw':b.type==='animal'?'animal:'+b.kind:b.type==='block'?'blkraw:'+b.mat:b.type==='sword'?'sword:'+b.kind:b.type==='gun'?'gun:'+b.kind:b.type==='car'?'car:'+b.kind:b.type==='xpl'?(XPL[b.kind].hidden?null:'xpl:'+b.kind):b.type;
       return id?{id,x:c.x,y:c.y,sc:b.scale||1,dead:b.type==='bird'&&!b.alive,f:b.f,name:b.name,hat:b.hat,paint:b.paint}:null}).filter(Boolean)};
@@ -5421,7 +5468,7 @@ function loadWorld(){
   pushUndo();
   let data=null;try{data=JSON.parse(localStorage.getItem('birdSandboxWorld'))}catch(e){}
   if(!data){toast('No saved world yet');return}
-  xform=null;bodies=[];ropes=[];walls=[];ponds=[];trees=[];houses=[];fx=[];drags.clear();tieA=null;inspected=null;mirrors=[];feeders=[];lamps=[];sprinklers=[];slings=[];aaSites=[];interceptors=[];portals=[];portalPending=null;holes=[];tornados=[];waterDrops=[];quakeT=0;holdTool=null;
+  xform=null;bodies=[];ropes=[];walls=[];ponds=[];trees=[];houses=[];fx=[];drags.clear();tieA=null;inspected=null;mirrors=[];feeders=[];lamps=[];sprinklers=[];slings=[];aaSites=[];statues=[];interceptors=[];portals=[];portalPending=null;holes=[];tornados=[];waterDrops=[];quakeT=0;holdTool=null;
   Object.assign(S,data.S||{});tod=data.tod??tod;
   for(const w of data.walls)walls.push(w);for(const p of data.ponds)makePond(p.x+p.w/2,p.w);const XB=o=>typeof o==='number'?[o,groundY]:[o.x,o.base??groundY];
   for(const o of data.trees)makeTree(...XB(o));for(const o of data.houses||[])makeHouse(...XB(o));for(const o of data.mirrors||[]){const[x,b]=XB(o);mirrors.push({x,base:b})}for(const o of data.feeders||[])makeFeeder(...XB(o));for(const o of data.lamps||[])makeLamp(...XB(o));for(const o of data.sprinklers||[])makeSprinkler(...XB(o));for(const o of data.slings||[]){slingSc=o.sc||1;makeSling(...XB(o));slingSc=1};for(const pr of data.portals||[])portals.push(pr);
@@ -5440,7 +5487,7 @@ function loadWorld(){
 $('bSave').onclick=saveWorld;$('bLoad').onclick=loadWorld;
 $('bUndo').onclick=()=>{unlockAudio();undo()};
 addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();undo()}});
-$('bClear').onclick=()=>{pushUndo();butterflies=[];plants=[];bubbles=[];xform=null;inspected=null;houses=[];mirrors=[];feeders=[];lamps=[];sprinklers=[];slings=[];aaSites=[];interceptors=[];portals=[];portalPending=null;holes=[];tornados=[];waterDrops=[];quakeT=0;holdTool=null;bodies=[];ropes=[];walls=[];ponds=[];trees=[];fx=[];drags.clear();tieA=null;toast('Cleared')};
+$('bClear').onclick=()=>{pushUndo();butterflies=[];plants=[];bubbles=[];xform=null;inspected=null;houses=[];mirrors=[];feeders=[];lamps=[];sprinklers=[];slings=[];aaSites=[];statues=[];interceptors=[];portals=[];portalPending=null;holes=[];tornados=[];waterDrops=[];quakeT=0;holdTool=null;bodies=[];ropes=[];walls=[];ponds=[];trees=[];fx=[];drags.clear();tieA=null;toast('Cleared')};
 
 function panelH(){return document.getElementById('panel').offsetHeight}
 function resize(){
