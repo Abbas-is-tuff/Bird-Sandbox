@@ -138,7 +138,7 @@ const ICE={ice:true};
 const BIRDS=[
  {name:'Cookie',s:1,body:'#f6f1e3',belly:'#fffaf0',wing:'#ece2c8',wingTip:'#dccb9c',head:'#fff8dc',face:'#ffe14d',cheek:'#ff8a33',crest:'#ffd23f',beak:'#cfa883',tail:'#ece2c8',tailLen:1.3,legs:'#e9a3a3',pitch:1,call:'tiel',walker:true},
  {name:'Lightning',s:.8,body:'#8b8e93',belly:'#999ca1',wing:'#7a7d82',wingTip:'#f3f3f3',head:'#9c9fa4',face:'#ffdd55',cheek:'#ff7a2e',crest:'#d9cf55',beak:'#a09489',tail:'#5d6066',tailLen:1.3,legs:'#9a8f86',pitch:1.3,call:'tiel',walker:true},
- {name:'Snowflake',s:1.05,body:'#ffffff',belly:'#ffffff',wing:'#f7f4ef',wingTip:'#efe9df',head:'#ffffff',face:'#ffffff',crest:'#ffffff',beak:'#ecc9c2',cere:'#f2a3ad',iris:'#5a1f22',tail:'#f7f4ef',tailLen:1.3,legs:'#f4bcbc',pitch:1.05,call:'tiel',walker:true},
+ {name:'Snowflake',pow:1.12,s:1.05,body:'#ffffff',belly:'#ffffff',wing:'#f7f4ef',wingTip:'#efe9df',head:'#ffffff',face:'#ffffff',crest:'#ffffff',beak:'#ecc9c2',cere:'#f2a3ad',iris:'#5a1f22',tail:'#f7f4ef',tailLen:1.3,legs:'#f4bcbc',pitch:1.05,call:'tiel',walker:true},
  {name:'Mini Snowflake',s:.72,body:'#f8f6f1',belly:'#ffffff',wing:'#d8d0c3',wingTip:'#c7bcab',head:'#fbfaf6',face:'#f1ece2',crest:'#f4f0e8',beak:'#e3cbbb',tail:'#d3cabb',tailLen:1.3,legs:'#d6b39c',pitch:1.4,call:'tiel',walker:true},
  {name:'Salman',top:true,mega:true,strong:true,s:1.15,body:'#8d9295',belly:'#a1a6a9',wing:'#7b8083',wingTip:'#5b6063',head:'#a7acaf',face:'#eceff0',cheek:null,crest:null,beak:'#1d1d1d',hook:true,tail:'#d9252b',tailLen:.8,legs:'#555',pitch:.72,call:'grey',walker:true},
  {name:'Lemon',mega:true,strong:true,s:.95,body:'#2fae3c',belly:'#ff5a1f',wing:'#2a9e36',wingTip:'#1b6e25',head:'#2848d8',face:'#3557ea',cheek:null,crest:null,collar:'#a6e22e',beak:'#ff3b1f',hook:true,tail:'#2fae3c',tailLen:1.1,legs:'#777',pitch:1.15,call:'lory',walker:true},
@@ -1107,7 +1107,7 @@ function flyStep(b,dt,grounded){
 }
 function hurt(b,d,quiet){
   if(!b.alive){if(d>4)feathers(b,Math.min(5,d/8));return}
-  d*=.45*(b.def.top?.3:b.def.mega?.4:b.def.strong?.5:1); // tougher birds (Abbas is extra tough 💪, Lemon is a tank 🛡️)
+  d*=.45/(b.def.pow||1)*(b.def.top?.3:b.def.mega?.4:b.def.strong?.5:1); // tougher birds (Abbas is extra tough 💪, Lemon is a tank 🛡️)
   b.lastHurtT=simTime;
   if(atk&&atk!==b&&isCreature(atk)){b.lastAtk=atk;b.lastAtkT=simTime}
   b.health-=d;if(d>.6&&b.health>0)emoHurt(b,d);b.hurtT=3;b.sleep=false;
@@ -4859,7 +4859,7 @@ function emotionUpdate(dt){
     if(b.peckT>0)b.peckT-=sec;
     if(b.inj)injuryHeal(b,sec);
     // everyone slowly heals once they've had a few seconds without getting hurt (holding a gun or not)
-    if(b.health<100&&!(b.fire>0)&&simTime-(b.lastHurtT??-99)>4){const rest=b.sleep||b.act==='sleep'||b.inHouse;b.health=Math.min(100,b.health+sec*(rest?4:1.6)*(b.wrathT>0?.5:1)*(b.def.top?2.6:b.def.mega?2.2:b.def.strong?1.8:1))}
+    if(b.health<100&&!(b.fire>0)&&simTime-(b.lastHurtT??-99)>4){const rest=b.sleep||b.act==='sleep'||b.inHouse;b.health=Math.min(100,b.health+sec*(rest?4:1.6)*(b.wrathT>0?.5:1)*(b.def.top?2.6:b.def.mega?2.2:b.def.strong?1.8:1)*(b.def.pow||1))}
     // running away / charging: keep pushing every frame
     if(b.runT>0){b.runT-=sec;if(!busy(b)){const ps=b.type==='bird'?[b.U,b.L,b.H]:[b.C,b.Hp,b.Hd];if(b.type==='animal'&&b.act!=='walk'&&b.act!=='pounce'){b.act='walk';b.actT=.5}const top=b.type==='bird'?Math.max(2.6,(b.def.run||1)*2.4)*Math.max(.8,Math.min(1.6,b.s||1)):(b.def.spd||1.5)*Math.max(1,b.s||1)*1.7;
       const[vx]=vel(ps[0]);for(const p of ps)addVel(p,(b.runDir*top-vx)*.08*dt,0);b.f=b.runDir}}
@@ -4901,7 +4901,7 @@ function emotionUpdate(dt){
       if(b.emoT<=0)feel(b,EMO_ICON.angry);
       if(d>(b.wrathT>0||b.defend?60:45)*(b.s||1)+20)moveToward(b,q.x,q.y,true);
       else if(!(b.peckT>0)){b.peckT=b.wrathT>0||b.defend?.45:.8;b.f=q.x>me.x?1:-1;if(b.type==='bird'){b.act='peck';b.actT=.4}
-        const pw=(b.type==='animal'?Math.min(3,b.def.mass/3):1)*(b.wrathT>0?5:b.defend?3.5:1)*(b.def.top?4.5:b.def.mega?3.6:b.def.strong?3:1);
+        const pw=(b.type==='animal'?Math.min(3,b.def.mass/3):1)*(b.wrathT>0?5:b.defend?3.5:1)*(b.def.top?4.5:b.def.mega?3.6:b.def.strong?3:1)*(b.def.pow||1);
         for(const p of foe.ps)addVel(p,b.f*2*pw,-1.5);
         atk=b;if(foe.type==='bird')hurt(foe,2*pw,true);else hurtAnimal(foe,2*pw);atk=null;
         fx.push({t:'star',x:q.x,y:q.y-10,vx:rand(-1,1),vy:-2,life:.6});if(okSnd('bonk',60))tone('square',300,180,.06,.05,null,q.x);
