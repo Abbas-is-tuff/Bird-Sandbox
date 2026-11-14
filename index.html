@@ -1655,7 +1655,7 @@ function render(){
   shadeBodies(ctx);
   for(const b of bodies)if(b.type==='bird')drawBird(ctx,b);
   for(const b of bodies)if(b.type==='balloon')drawBody(ctx,b);
-  drawSlings();drawFrozen();drawInjuries(ctx);drawEmotions(ctx);
+  drawSlings();drawAA(ctx);drawFrozen();drawInjuries(ctx);drawEmotions(ctx);
   for(const t of trees)drawLeaves(ctx,t,true);
   drawFish(ctx);
   // water (drawn over what's inside it)
@@ -2443,7 +2443,7 @@ function catchFish(b,pd,f){
 }
 /* ---- per-step updates ---- */
 function natureEarly(dt){
-  const sec=dt/60;updateCritters(dt);animalFamilies(dt);swordUpdate(dt);gunUpdate(dt);carUpdate(dt);emotionUpdate(dt);updateBuckets(dt);updateMapExtras(dt);
+  const sec=dt/60;updateCritters(dt);animalFamilies(dt);swordUpdate(dt);gunUpdate(dt);carUpdate(dt);updateAA(dt);emotionUpdate(dt);updateBuckets(dt);updateMapExtras(dt);
   // plants make food
   for(const pl of [...plants]){
     pl.t-=sec;
@@ -3553,7 +3553,7 @@ function loadMap(id,silent){
   if(!MAPS[id])id='meadow';
   pushUndo();
   // wipe the world (same as 🧹 Clear)
-  butterflies=[];plants=[];bubbles=[];xform=null;inspected=null;houses=[];mirrors=[];feeders=[];lamps=[];sprinklers=[];slings=[];portals=[];portalPending=null;holes=[];tornados=[];waterDrops=[];quakeT=0;holdTool=null;
+  butterflies=[];plants=[];bubbles=[];xform=null;inspected=null;houses=[];mirrors=[];feeders=[];lamps=[];sprinklers=[];slings=[];aaSites=[];interceptors=[];portals=[];portalPending=null;holes=[];tornados=[];waterDrops=[];quakeT=0;holdTool=null;
   bodies=[];ropes=[];walls=[];ponds=[];trees=[];fx=[];drags.clear();tieA=null;allP=[];pairs=[];
   MAP=MAPS[id];MAPID=id;rainbow=0;prevWeather=MAP.weather;cam={x:0,y:0,z:1};camFollow=null;sendSel=null;genChunks=new Set();updView();
   S.weather=MAP.weather;S.grav=MAP.grav;setTime(MAP.time);snowCover=id==='snow'?.9:0;
@@ -3787,6 +3787,7 @@ BIRDS.push({name:'Kauaʻi ʻŌʻō',s:.8,bk:1.6,body:'#1e1c1a',belly:'#4a3a2e',w
 let pendingSpawn=null;
 function doSpawn(ps,withDrag){
   pendingSpawn=null;pushUndo();const x=ps.x,y=ps.y,id=ps.id;
+  if(id==='aa'){if(aaSites.length<6){makeAA(x,surfaceAt(x,y));tone('square',200,400,.2,.05,null,x)}return}
   if(id.startsWith('sling:')){const z=SLING_SIZES.find(a=>'sling:'+a[0]===id);slingSc=z?z[2]:1;spawn('sling',x,y);slingSc=1;return}
   if(id==='tree'||id==='house'||id==='lamp'||id==='feeder'||id==='sling'||id==='mirror'||id==='sprinkler'){spawn(id,x,y);return}
   const b=spawn(id,x,Math.min(y,(terrainOn?gAt(x):groundY)-20));
@@ -5007,6 +5008,62 @@ function injHTML(b){if(!b.inj||!Object.keys(b.inj).length)return '';
   return '<div style="margin-top:6px;color:#ff9a8a">Injuries</div>'+Object.entries(b.inj).map(([p,I])=>'<div style="font-size:12px">'+INJ[I.type].ic+' '+INJ[I.type].n+' — '+PART_NAME[p]+' <span style="color:#9fb3cf">(heals in ~'+Math.max(1,Math.ceil(I.t))+'s'+(I.type==='disl'?' or tap 💉':'')+')</span></div>').join('')}
 
 function jl(b,part){const I=b.inj&&b.inj[part];return I?I.len0:injJoint(b,part).len}
+/* =================== AIR DEFENSE: shoots down rockets & bombs =================== */
+var aaSites=[],interceptors=[];
+function makeAA(x,base){const q={x,base,ang:-Math.PI/2,cd:0,ammo:0};aaSites.push(q);return q}
+function aaThreat(o){
+  if(o.dead||o.aaLock||o.dragT)return false;const p=o.ps[0];const[vx,vy]=vel(p),sp=Math.hypot(vx,vy);
+  const air=p.y<(terrainOn?gAt(p.x):groundY)-35;
+  if(o.type==='xpl'){if(o.kind==='mine'||o.kind==='c4'||o.stuck)return false;return air&&(sp>2||o.impact)}
+  if(o.type==='bomb'||o.type==='meteor'||o.type==='tnt')return air&&sp>2.5;
+  return false}
+function updateAA(dt){
+  const sec=dt/60;
+  for(const q of aaSites){q.cd-=sec;const tx=q.x,ty=q.base-34;
+    let best=null,bd=1700;for(const o of bodies){if(!aaThreat(o))continue;const p=o.ps[0],d=Math.hypot(p.x-tx,p.y-ty);if(d<bd){bd=d;best=o}}
+    q.tgt=best;
+    if(best){const p=best.ps[0],want=Math.atan2(p.y-ty,p.x-tx);let da=want-q.ang;while(da>Math.PI)da-=TAU;while(da<-Math.PI)da+=TAU;q.ang+=clamp(da,-.2*dt,.2*dt);
+      if(q.cd<=0&&Math.abs(da)<1.2){q.cd=.15;q.ammo^=1;best.aaLock=true;
+        const side=q.ammo?-1:1,nx=-Math.sin(q.ang)*side*5,ny=Math.cos(q.ang)*side*5;
+        interceptors.push({x:tx+Math.cos(q.ang)*26+nx,y:ty+Math.sin(q.ang)*26+ny,vx:Math.cos(want)*24,vy:Math.sin(want)*24,t:best,life:5});
+        noise(.3,.25,1500,'bandpass',tx,2);tone('sawtooth',300,900,.25,.04,800,tx);
+        for(let i=0;i<6;i++)fx.push({t:'smoke',x:tx,y:ty,vx:-Math.cos(q.ang)*rand(1,3)+rand(-1,1),vy:-Math.sin(q.ang)*rand(1,3),life:.7,s:rand(5,9)})}}
+    else q.ang+=(-Math.PI/2-q.ang)*.02*dt}
+  for(const m of interceptors){m.life-=sec;const t=m.t;
+    if(t&&!t.dead){const p=t.ps[0],[tvx,tvy]=vel(p);const dd0=Math.hypot(p.x-m.x,p.y-m.y),lead=dd0>220?Math.min(5,dd0/60):0;const ax=p.x+tvx*lead-m.x,ay=p.y+tvy*lead-m.y,l=Math.hypot(ax,ay)||1;
+      const ms=Math.min(60,34+(5-m.life)*40);m.vx+=(ax/l*ms-m.vx)*.3*dt;m.vy+=(ay/l*ms-m.vy)*.3*dt;
+      // check along the whole path this step (so a fast missile can't skip past)
+      const sx=m.vx*dt,sy=m.vy*dt,L2=sx*sx+sy*sy||1,tt=clamp(((p.x-m.x)*sx+(p.y-m.y)*sy)/L2,0,1),cx=m.x+sx*tt,cy=m.y+sy*tt;
+      if(Math.hypot(p.x-cx,p.y-cy)<p.r+26){m.x=cx;m.y=cy;aaBoom(m.x,m.y);t.dead=true;m.life=0;
+        fx.push({t:'text',x:m.x,y:m.y-24,vy:-.7,life:1.2,txt:'🎯 Intercepted!'});continue}}
+    else{m.vy+=.15*dt;if(!m.lost){m.lost=true;m.life=Math.min(m.life,1.2)}}
+    m.x+=m.vx*dt;m.y+=m.vy*dt;
+    if(Math.random()<.7)fx.push({t:'smoke',x:m.x-m.vx*.6,y:m.y-m.vy*.6,vx:rand(-.4,.4),vy:rand(-.4,.4),life:.5,s:rand(3,6),col:'rgba(220,220,220,.6)'});
+    if(m.y>(terrainOn?gAt(m.x):groundY)-3||m.life<=0){aaBoom(m.x,m.y);m.life=0}}
+  interceptors=interceptors.filter(m=>m.life>0);
+  for(const o of bodies)if(o.aaLock&&!interceptors.some(m=>m.t===o))o.aaLock=false;
+}
+function aaBoom(x,y){
+  fx.push({t:'flash',x,y,r:45,life:.5});for(let i=0;i<16;i++){const a=rand(0,TAU),v=rand(2,6);fx.push({t:'spark',x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,life:.6,col:i%2?'#ffd23f':'#ff7b29'})}
+  for(let i=0;i<5;i++)fx.push({t:'smoke',x:x+rand(-8,8),y:y+rand(-8,8),vx:rand(-1,1),vy:rand(-1,0),life:.8,s:rand(8,14)});
+  noise(.25,.3,900,'lowpass',x);tone('sine',140,60,.25,.1,null,x);
+  for(const p of allP){const dx=p.x-x,dy=p.y-y,d=Math.hypot(dx,dy);if(d<60&&d>0)addVel(p,dx/d*2,dy/d*2)}
+}
+function drawAA(c){
+  for(const q of aaSites){const x=q.x,b=q.base;
+    c.fillStyle='#4b5d3a';rr(c,x-26,b-16,52,16,4);c.fill();c.fillStyle='#3a4a2e';rr(c,x-18,b-28,36,14,4);c.fill();
+    c.fillStyle='#2a2a2a';for(const o of [-18,-6,6,18])circle(c,x+o,b-3,4);
+    c.save();c.translate(x,b-34);c.rotate(q.ang);c.fillStyle='#5a6b48';rr(c,-8,-12,36,24,5);c.fill();
+    c.fillStyle='#2e3a24';rr(c,4,-10,28,8,3);c.fill();rr(c,4,2,28,8,3);c.fill();
+    c.fillStyle='#e01e37';circle(c,32,-6,2.6);circle(c,32,6,2.6);c.restore();
+    c.fillStyle='#8a9a7a';circle(c,x,b-34,6);
+    if(q.tgt){c.strokeStyle='rgba(255,60,60,.35)';c.setLineDash([6,8]);c.lineWidth=1.5;c.beginPath();c.moveTo(x,b-34);const p=q.tgt.ps[0];c.lineTo(p.x,p.y);c.stroke();c.setLineDash([])}
+    // radar dish
+    c.strokeStyle='#c9d1d9';c.lineWidth=2;const ra=simTime*3;c.beginPath();c.moveTo(x-20,b-28);c.lineTo(x-20+Math.cos(ra)*8,b-38);c.stroke()}
+  for(const m of interceptors){const a=Math.atan2(m.vy,m.vx);c.save();c.translate(m.x,m.y);c.rotate(a);c.fillStyle='#e8ecf0';rr(c,-9,-2.5,16,5,2);c.fill();c.fillStyle='#e01e37';c.beginPath();c.moveTo(7,-2.5);c.lineTo(12,0);c.lineTo(7,2.5);c.fill();
+    c.fillStyle='#ffb347';c.beginPath();c.moveTo(-9,-2);c.lineTo(-15-Math.random()*5,0);c.lineTo(-9,2);c.fill();c.restore()}
+}
+
 /* =================== UNDO =================== */
 const undoStack=[];
 function pushUndo(){
@@ -5105,6 +5162,7 @@ cv.addEventListener('pointerdown',e=>{
       const ri=ropes.findIndex(r=>distSeg(x,y,r.a,r.b)<14);if(ri>=0){ropes.splice(ri,1);pop(1.2,x);break}
       const sq=sprinklers.find(q=>Math.abs(x-q.x)<22&&y>(q.base??groundY)-40&&y<(q.base??groundY)+15);if(sq){sq.removed=true;sprinklers=sprinklers.filter(o=>o!==sq);pop(.7,x);break}
       const lp=lamps.find(l=>Math.abs(x-l.x)<20&&y>l.y-22&&y<(l.base??groundY));if(lp){walls=walls.filter(w=>w.lamp!==lp);lamps=lamps.filter(o=>o!==lp);pop(.7,x);break}
+      const aq=aaSites.find(q=>Math.abs(x-q.x)<32&&y>q.base-60&&y<q.base+4);if(aq){aaSites=aaSites.filter(o=>o!==aq);pop(.7,x);break}
       const sl=slings.find(q=>Math.abs(x-q.x)<45*(q.sc||1)&&y>q.y-25*(q.sc||1)&&y<(q.base??groundY));if(sl){slings=slings.filter(o=>o!==sl);for(const d of drags.values())if(d.sling===sl)d.sling=null;pop(.7,x);break}
       const pti=portals.findIndex(pr=>Math.hypot(x-pr.a.x,y-pr.a.y)<30||Math.hypot(x-pr.b.x,y-pr.b.y)<30);if(pti>=0){portals.splice(pti,1);pop(.7,x);break}
       const fd=feeders.find(f=>Math.abs(x-f.x)<36&&y>f.y-75&&y<(f.base??groundY));if(fd){removeFeeder(fd);pop(.7,x);break}
@@ -5253,7 +5311,8 @@ ITEMS.push(...NEW_ITEMS,...MORE_ITEMS);
 const WEAPON_IDS=['cannon','anvil'],BOMB_IDS=['bomb','tnt'];
 const BOMBS_TAB=[...BOMB_IDS.map(id=>ITEMS.find(it=>it.id===id)).filter(Boolean),...BOMB_ITEMS];for(const id of BOMB_IDS){const i=ITEMS.findIndex(it=>it.id===id);if(i>=0)ITEMS.splice(i,1)}
 {const i=WORLD.findIndex(it=>it.id==='sling');if(i>=0)WORLD.splice(i,1,...SLING_ITEMS)}
-const WEAPONS=[...GUN_ITEMS,...MORE_GUN_ITEMS,...SWORD_ITEMS,...WEAPON_IDS.map(id=>ITEMS.find(it=>it.id===id)).filter(Boolean),...SLING_ITEMS];
+const AA_ITEM={id:'aa',ic:'🛡️',n:'Air defense',h:'<b>Air defense</b> — tracks incoming rockets, bombs, grenades and meteors and shoots them down with homing missiles 🎯'};
+const WEAPONS=[AA_ITEM,...GUN_ITEMS,...MORE_GUN_ITEMS,...SWORD_ITEMS,...WEAPON_IDS.map(id=>ITEMS.find(it=>it.id===id)).filter(Boolean),...SLING_ITEMS];
 for(const id of WEAPON_IDS){const i=ITEMS.findIndex(it=>it.id===id);if(i>=0)ITEMS.splice(i,1)}TOOLS.push(...CAM_TOOLS);
 let tab='birds';
 const itemsEl=document.getElementById('items'),hintEl=document.getElementById('hint'),setEl=document.getElementById('settings');
@@ -5337,7 +5396,7 @@ function loadWorld(){
   pushUndo();
   let data=null;try{data=JSON.parse(localStorage.getItem('birdSandboxWorld'))}catch(e){}
   if(!data){toast('No saved world yet');return}
-  xform=null;bodies=[];ropes=[];walls=[];ponds=[];trees=[];houses=[];fx=[];drags.clear();tieA=null;inspected=null;mirrors=[];feeders=[];lamps=[];sprinklers=[];slings=[];portals=[];portalPending=null;holes=[];tornados=[];waterDrops=[];quakeT=0;holdTool=null;
+  xform=null;bodies=[];ropes=[];walls=[];ponds=[];trees=[];houses=[];fx=[];drags.clear();tieA=null;inspected=null;mirrors=[];feeders=[];lamps=[];sprinklers=[];slings=[];aaSites=[];interceptors=[];portals=[];portalPending=null;holes=[];tornados=[];waterDrops=[];quakeT=0;holdTool=null;
   Object.assign(S,data.S||{});tod=data.tod??tod;
   for(const w of data.walls)walls.push(w);for(const p of data.ponds)makePond(p.x+p.w/2,p.w);const XB=o=>typeof o==='number'?[o,groundY]:[o.x,o.base??groundY];
   for(const o of data.trees)makeTree(...XB(o));for(const o of data.houses||[])makeHouse(...XB(o));for(const o of data.mirrors||[]){const[x,b]=XB(o);mirrors.push({x,base:b})}for(const o of data.feeders||[])makeFeeder(...XB(o));for(const o of data.lamps||[])makeLamp(...XB(o));for(const o of data.sprinklers||[])makeSprinkler(...XB(o));for(const o of data.slings||[]){slingSc=o.sc||1;makeSling(...XB(o));slingSc=1};for(const pr of data.portals||[])portals.push(pr);
@@ -5356,7 +5415,7 @@ function loadWorld(){
 $('bSave').onclick=saveWorld;$('bLoad').onclick=loadWorld;
 $('bUndo').onclick=()=>{unlockAudio();undo()};
 addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();undo()}});
-$('bClear').onclick=()=>{pushUndo();butterflies=[];plants=[];bubbles=[];xform=null;inspected=null;houses=[];mirrors=[];feeders=[];lamps=[];sprinklers=[];slings=[];portals=[];portalPending=null;holes=[];tornados=[];waterDrops=[];quakeT=0;holdTool=null;bodies=[];ropes=[];walls=[];ponds=[];trees=[];fx=[];drags.clear();tieA=null;toast('Cleared')};
+$('bClear').onclick=()=>{pushUndo();butterflies=[];plants=[];bubbles=[];xform=null;inspected=null;houses=[];mirrors=[];feeders=[];lamps=[];sprinklers=[];slings=[];aaSites=[];interceptors=[];portals=[];portalPending=null;holes=[];tornados=[];waterDrops=[];quakeT=0;holdTool=null;bodies=[];ropes=[];walls=[];ponds=[];trees=[];fx=[];drags.clear();tieA=null;toast('Cleared')};
 
 function panelH(){return document.getElementById('panel').offsetHeight}
 function resize(){
