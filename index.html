@@ -2126,20 +2126,28 @@ function drawFan(c,b){
 
 /* =================== SLINGSHOT, TOWER, PORTALS =================== */
 let slings=[],portals=[],portalPending=null;
-function makeSling(x,base=groundY){const q={x:x,y:base-72,base};slings.push(q);return q}
+function makeSling(x,base=groundY){const q={x:x,y:base-165,base};slings.push(q);return q}
 function launchFromSling(d){
   const q=d.sling,b=d.p.body,c=d.p,dx=q.x-c.x,dy=q.y-c.y,dd=Math.hypot(dx,dy);if(dd<18||b.dead)return;
-  const k=.34;for(const p of b.ps){if(p.pinned)continue;p.px=p.x-dx*k*DT;p.py=p.y-dy*k*DT;p.lvx=dx*k;p.lvy=dy*k}
+  const k=.21;for(const p of b.ps){if(p.pinned)continue;p.px=p.x-dx*k*DT;p.py=p.y-dy*k*DT;p.lvx=dx*k;p.lvy=dy*k}
   b.toughT=3;b.heldF=frameNo;if(b.type==='bird'&&b.alive){b.stun=Math.max(b.stun,1.2);b.flyT=0;b.goal=null;b.sleep=false}
   tone('triangle',180,90,.25,.12,null,q.x);noise(.12,.25,1500,'bandpass',q.x,2);
 }
 function drawSlings(){
   for(const q of slings){
-    ctx.strokeStyle=mix('#2a1a0c','#7a4a22',light);ctx.lineCap='round';ctx.lineWidth=9;ctx.beginPath();ctx.moveTo(q.x,q.base??groundY);ctx.lineTo(q.x,q.y+26);ctx.lineTo(q.x-13,q.y);ctx.moveTo(q.x,q.y+26);ctx.lineTo(q.x+13,q.y);ctx.stroke();
-    let ld=null;for(const d of drags.values())if(d.sling===q)ld=d.p;
-    ctx.strokeStyle='#5a2d0c';ctx.lineWidth=4;ctx.beginPath();
-    if(ld){ctx.moveTo(q.x-13,q.y);ctx.lineTo(ld.x,ld.y);ctx.lineTo(q.x+13,q.y)}else{ctx.moveTo(q.x-13,q.y);ctx.quadraticCurveTo(q.x,q.y+8,q.x+13,q.y)}
-    ctx.stroke();
+    const A=30,base=q.base??groundY,fy=q.y+58;let ld=null;for(const d of drags.values())if(d.sling===q)ld=d.p;
+    // back band
+    ctx.strokeStyle='#4a2208';ctx.lineCap='round';ctx.lineWidth=7;ctx.beginPath();ctx.moveTo(q.x+A,q.y);if(ld)ctx.lineTo(ld.x,ld.y);else ctx.quadraticCurveTo(q.x,q.y+16,q.x,q.y+14);ctx.stroke();
+    // wooden Y
+    for(const [w,col] of [[20,mix('#1a1006','#5a3414',light)],[14,mix('#2a1a0c','#8a5428',light)]]){ctx.strokeStyle=col;ctx.lineWidth=w;ctx.beginPath();ctx.moveTo(q.x,base);ctx.lineTo(q.x,fy);ctx.quadraticCurveTo(q.x-A*.6,fy-12,q.x-A,q.y);ctx.moveTo(q.x,fy);ctx.quadraticCurveTo(q.x+A*.6,fy-12,q.x+A,q.y);ctx.stroke()}
+    ctx.strokeStyle=mix('#3a2410','#c9883a',light);ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(q.x-4,base-6);ctx.lineTo(q.x-4,fy+10);ctx.stroke();
+    // grip wrap
+    ctx.fillStyle='#7a2a1a';for(let i=0;i<4;i++){ctx.fillRect(q.x-10,fy+20+i*9,20,5)}
+    // front band + pouch
+    ctx.strokeStyle='#5a2d0c';ctx.lineWidth=7;ctx.beginPath();ctx.moveTo(q.x-A,q.y);
+    if(ld){ctx.lineTo(ld.x,ld.y);ctx.stroke();ctx.fillStyle='#3a1a08';ctx.beginPath();ctx.ellipse(ld.x,ld.y,11,8,Math.atan2(ld.y-q.y,ld.x-q.x)+Math.PI/2,0,TAU);ctx.fill()}
+    else{ctx.quadraticCurveTo(q.x,q.y+16,q.x+A,q.y);ctx.stroke();ctx.fillStyle='#3a1a08';ctx.beginPath();ctx.ellipse(q.x,q.y+11,12,6,0,0,TAU);ctx.fill()}
+    ctx.fillStyle=mix('#1a1006','#5a3414',light);circle(ctx,q.x-A,q.y,8);circle(ctx,q.x+A,q.y,8);
   }
 }
 function buildTower(x){
@@ -4779,7 +4787,7 @@ cv.addEventListener('pointerdown',e=>{
       const ri=ropes.findIndex(r=>distSeg(x,y,r.a,r.b)<14);if(ri>=0){ropes.splice(ri,1);pop(1.2,x);break}
       const sq=sprinklers.find(q=>Math.abs(x-q.x)<22&&y>(q.base??groundY)-40&&y<(q.base??groundY)+15);if(sq){sq.removed=true;sprinklers=sprinklers.filter(o=>o!==sq);pop(.7,x);break}
       const lp=lamps.find(l=>Math.abs(x-l.x)<20&&y>l.y-22&&y<(l.base??groundY));if(lp){walls=walls.filter(w=>w.lamp!==lp);lamps=lamps.filter(o=>o!==lp);pop(.7,x);break}
-      const sl=slings.find(q=>Math.abs(x-q.x)<25&&y>q.y-15&&y<(q.base??groundY));if(sl){slings=slings.filter(o=>o!==sl);for(const d of drags.values())if(d.sling===sl)d.sling=null;pop(.7,x);break}
+      const sl=slings.find(q=>Math.abs(x-q.x)<45&&y>q.y-25&&y<(q.base??groundY));if(sl){slings=slings.filter(o=>o!==sl);for(const d of drags.values())if(d.sling===sl)d.sling=null;pop(.7,x);break}
       const pti=portals.findIndex(pr=>Math.hypot(x-pr.a.x,y-pr.a.y)<30||Math.hypot(x-pr.b.x,y-pr.b.y)<30);if(pti>=0){portals.splice(pti,1);pop(.7,x);break}
       const fd=feeders.find(f=>Math.abs(x-f.x)<36&&y>f.y-75&&y<(f.base??groundY));if(fd){removeFeeder(fd);pop(.7,x);break}
       const mi=mirrors.findIndex(m=>Math.abs(x-m.x)<26&&y>(m.base??groundY)-90&&y<(m.base??groundY)+10);if(mi>=0){mirrors[mi].removed=true;mirrors.splice(mi,1);pop(.7,x);break}
@@ -4822,8 +4830,8 @@ cv.addEventListener('pointermove',e=>{
   if(gestureMove(e))return;
   if(holdTool&&holdTool.pid===e.pointerId){holdTool.vx=WX(e)-holdTool.x;holdTool.x=WX(e);holdTool.y=WY(e)}
   const d=drags.get(e.pointerId);if(d){d.x=WX(e);d.y=WY(e);
-    if(!d.sling&&!d.p.pinned)for(const q of slings)if(Math.hypot(d.p.x-q.x,d.p.y-q.y)<55){d.sling=q;break}
-    if(d.sling){const q=d.sling,dx=d.x-q.x,dy=d.y-q.y,dd=Math.hypot(dx,dy);if(dd>230)d.sling=null;else if(dd>115){d.x=q.x+dx/dd*115;d.y=q.y+dy/dd*115}}}
+    if(!d.sling&&!d.p.pinned)for(const q of slings)if(Math.hypot(d.p.x-q.x,d.p.y-q.y)<90){d.sling=q;break}
+    if(d.sling){const q=d.sling,dx=d.x-q.x,dy=d.y-q.y,dd=Math.hypot(dx,dy);if(dd>520)d.sling=null;else if(dd>260){d.x=q.x+dx/dd*260;d.y=q.y+dy/dd*260}}}
   if(wallDraw&&wallDraw.id===e.pointerId){wallDraw.x1=WX(e);wallDraw.y1=Math.min(WY(e),groundY)}
   if(pondDraw&&pondDraw.id===e.pointerId)pondDraw.x1=WX(e);
   if(xform&&xform.id===e.pointerId){
