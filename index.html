@@ -2827,10 +2827,10 @@ function restDamp(dt){
 /* =================== ANIMALS =================== */
 let butterflies=[];
 const ANIMALS={
-  vex:{n:'Vex',pet:1,gentle:true,ic:'🐱',s:.9,bl:11,ll:15,hr:10,br:11,body:'#f3dcbf',belly:'#fdf3e6',dark:'#e2bf98',ear:'#f6c9c4',eye:'#7fb6d8',nose:'#f2a7a7',pads:'#f2a2a8',fluffy:true,tailW:9,tail:'#f6e2c8',cat:true,hunter:true,spd:2.5,jump:7,mass:1.1,dens:.6,voice:1.25,eats:['flopfish','chunk','cochalf']},
-  orange:{n:'Orange Cat',ic:'🐈',s:1,bl:12,ll:14,hr:9.5,br:10.5,body:'#e8892f',belly:'#f6d2a8',dark:'#b8611c',ear:'#f2b0a0',eye:'#9acd32',nose:'#e88a8a',pads:'#3a2a2a',stripes:'#b8611c',tailW:6,tail:'#e8892f',cat:true,hunter:true,spd:2.5,jump:7.5,mass:1.2,dens:.6,voice:1,eats:['flopfish','chunk']},
-  black:{n:'Black Cat',ic:'🐈‍⬛',s:1,bl:12,ll:14,hr:9.5,br:10.5,body:'#1f1f24',belly:'#2a2a30',dark:'#111114',ear:'#3a2e33',eye:'#ffd23f',nose:'#3a2e33',pads:'#3a2e33',tailW:6,tail:'#1f1f24',cat:true,hunter:true,spd:2.5,jump:8,mass:1.1,dens:.6,voice:.9,eats:['flopfish','chunk']},
-  grey:{n:'Grey Cat',ic:'🐱',s:1.05,bl:12,ll:13,hr:10,br:11,body:'#8e949c',belly:'#c9ced4',dark:'#6b7178',ear:'#d9a9a9',eye:'#ff9f1c',nose:'#d98a8a',pads:'#d98a8a',stripes:'#70767e',tailW:7,tail:'#8e949c',cat:true,hunter:true,spd:2.5,jump:7,mass:1.3,dens:.6,voice:.85,eats:['flopfish','chunk']},
+  vex:{n:'Vex',pet:1,gentle:true,ic:'🐱',s:.9,bl:11,ll:15,hr:10,br:11,body:'#f3dcbf',belly:'#fdf3e6',dark:'#e2bf98',ear:'#f6c9c4',eye:'#7fb6d8',nose:'#f2a7a7',pads:'#f2a2a8',fluffy:true,tailW:9,tail:'#f6e2c8',cat:true,hunter:true,spd:3.4,jump:7,mass:1.1,dens:.6,voice:1.25,eats:['flopfish','chunk','cochalf']},
+  orange:{n:'Orange Cat',ic:'🐈',s:1,bl:12,ll:14,hr:9.5,br:10.5,body:'#e8892f',belly:'#f6d2a8',dark:'#b8611c',ear:'#f2b0a0',eye:'#9acd32',nose:'#e88a8a',pads:'#3a2a2a',stripes:'#b8611c',tailW:6,tail:'#e8892f',cat:true,hunter:true,spd:3.4,jump:7.5,mass:1.2,dens:.6,voice:1,eats:['flopfish','chunk']},
+  black:{n:'Black Cat',ic:'🐈‍⬛',s:1,bl:12,ll:14,hr:9.5,br:10.5,body:'#1f1f24',belly:'#2a2a30',dark:'#111114',ear:'#3a2e33',eye:'#ffd23f',nose:'#3a2e33',pads:'#3a2e33',tailW:6,tail:'#1f1f24',cat:true,hunter:true,spd:3.4,jump:8,mass:1.1,dens:.6,voice:.9,eats:['flopfish','chunk']},
+  grey:{n:'Grey Cat',ic:'🐱',s:1.05,bl:12,ll:13,hr:10,br:11,body:'#8e949c',belly:'#c9ced4',dark:'#6b7178',ear:'#d9a9a9',eye:'#ff9f1c',nose:'#d98a8a',pads:'#d98a8a',stripes:'#70767e',tailW:7,tail:'#8e949c',cat:true,hunter:true,spd:3.4,jump:7,mass:1.3,dens:.6,voice:.85,eats:['flopfish','chunk']},
   dog:{n:'Dog',ic:'🐕',s:1.25,bl:14,ll:16,hr:11,br:12,body:'#d9a45a',belly:'#f2d7a8',dark:'#a8742e',ear:'#a8742e',eye:'#3a2414',nose:'#1f1f1f',pads:'#3a2a2a',flop:true,snout:1,tailW:5,tail:'#d9a45a',dog:true,spd:2,jump:6.5,mass:2.2,dens:.5,swim:true,voice:1,eats:['chunk','apple','melon']},
   bunny:{n:'Bunny',ic:'🐇',s:.85,bl:9,ll:9,hr:9,br:11,body:'#f4f1ec',belly:'#ffffff',dark:'#dcd6cc',ear:'#f6c3c8',eye:'#c0392b',nose:'#f29aa8',pads:'#e9b3b8',longEar:true,puff:true,tailW:0,tail:'#ffffff',hopper:true,spd:1.4,jump:6,mass:.8,dens:.6,voice:1.6,eats:['berry','apple','seed','chunk','pumpkin']},
   mouse:{n:'Mouse',ic:'🐁',s:.5,bl:9,ll:6,hr:8,br:9,body:'#9a8f86',belly:'#d9d0c6',dark:'#7a7068',ear:'#f2b0b8',eye:'#111111',nose:'#f29aa8',pads:'#f2b0b8',roundEar:true,tailW:2,tail:'#e8b0b0',thinTail:true,mouse:true,spd:2.4,jump:5,mass:.3,dens:.6,voice:2.2,eats:['seed','berry','chunk','cochalf']},
@@ -3002,8 +3002,10 @@ function animalAI(b,dt){
   }
   const st=walk&&!d.hopper?Math.sin(b.ph):0,lift=walk&&!d.hopper?Math.max(0,Math.cos(b.ph)):0;
   // stand on the paws, body level, head forward
-  if(att.legF&&FF.touch)addVel(C,(FF.x-st*3*s-C.x)*k*.25,(FF.y-dn*cH-C.y)*k*.8);
-  if(att.legB&&BF.touch)addVel(Hp,(BF.x+st*3*s-Hp.x)*k*.25,(BF.y-dn*hH-Hp.y)*k*.8);
+  if(FF.touch)FF.gF=frameNo;if(BF.touch)BF.gF=frameNo;
+  const fOn=FF.touch||frameNo-(FF.gF??-99)<12,bOn=BF.touch||frameNo-(BF.gF??-99)<12;
+  if(att.legF&&fOn){addVel(C,(FF.x-st*3*s-C.x)*k*.25,(FF.y-dn*cH-C.y)*k*1.1);if((FF.y-dn*cH-C.y)*dn<0)addVel(C,0,-G*dn*.35*dt)}
+  if(att.legB&&bOn){addVel(Hp,(BF.x+st*3*s-Hp.x)*k*.25,(BF.y-dn*hH-Hp.y)*k*1.1);if((BF.y-dn*hH-Hp.y)*dn<0)addVel(Hp,0,-G*dn*.35*dt)}
   const BL=d.bl*2*s,cx=(C.x+Hp.x)/2;
   addVel(C,(cx+f*BL/2-C.x)*k*.4,0);addVel(Hp,(cx-f*BL/2-Hp.x)*k*.4,0);
   const shell=b.shell>0||a==='shell';
@@ -3038,9 +3040,11 @@ function pickAnimalAct(b){
   if(d.cat||d.hunter){
     if(r<.3&&b.coolT<=0){const t=nearestOf(b,o=>(o.type==='bird'&&o.alive&&o.flyT<=0&&!o.inHouse&&(o.F1.touch||o.F2.touch||o.U.sub>0))||(o.type==='animal'&&(o.def.mouse||o.def.prey)&&o.alive),450);if(t){b.act='stalk';b.target=t;b.actT=8;return}}
     if(r<.42){const t=nearestOf(b,o=>['ball','beach','duck','berry'].includes(o.type),400);if(t){b.act='play';b.target=t;b.actT=5;return}}
-    if(r<.55){b.act='groom';b.actT=rand(2,4);if(Math.random()<.5)purr(b.C.x);return}
-    if(r<.7){b.act='sit';b.actT=rand(2,5);return}
-    if(r<.78){b.act='sleep';b.actT=rand(5,9);return}
+    if(r<.54){b.act='walk';b.actT=rand(1.5,3);b.f=Math.random()<.5?1:-1;b.runT=b.actT;b.runDir=b.f;return} // zoomies!
+    if(r<.62){b.act='groom';b.actT=rand(1.5,3);if(Math.random()<.5)purr(b.C.x);return}
+    if(r<.68){b.act='sit';b.actT=rand(1.5,3);return}
+    if(r<.72){b.act='sleep';b.actT=rand(4,7);return}
+    b.act='walk';b.actT=rand(2,5);if(Math.random()<.5)b.f*=-1;return
   }
   if(d.dog){
     if(r<.45){const t=nearestOf(b,o=>['ball','beach','duck','bowl','tire'].includes(o.type),600);if(t){b.act='play';b.target=t;b.actT=6;return}}
