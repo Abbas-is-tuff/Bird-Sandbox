@@ -2824,10 +2824,10 @@ function restDamp(dt){
 /* =================== ANIMALS =================== */
 let butterflies=[];
 const ANIMALS={
-  vex:{n:'Vex',pet:1,gentle:true,ic:'🐱',s:.9,bl:11,ll:15,hr:10,br:11,body:'#f3dcbf',belly:'#fdf3e6',dark:'#e2bf98',ear:'#f6c9c4',eye:'#7fb6d8',nose:'#f2a7a7',pads:'#f2a2a8',fluffy:true,tailW:9,tail:'#f6e2c8',cat:true,hunter:true,spd:1.5,jump:7,mass:1.1,dens:.6,voice:1.25,eats:['flopfish','chunk','cochalf']},
-  orange:{n:'Orange Cat',ic:'🐈',s:1,bl:12,ll:14,hr:9.5,br:10.5,body:'#e8892f',belly:'#f6d2a8',dark:'#b8611c',ear:'#f2b0a0',eye:'#9acd32',nose:'#e88a8a',pads:'#3a2a2a',stripes:'#b8611c',tailW:6,tail:'#e8892f',cat:true,hunter:true,spd:1.6,jump:7.5,mass:1.2,dens:.6,voice:1,eats:['flopfish','chunk']},
-  black:{n:'Black Cat',ic:'🐈‍⬛',s:1,bl:12,ll:14,hr:9.5,br:10.5,body:'#1f1f24',belly:'#2a2a30',dark:'#111114',ear:'#3a2e33',eye:'#ffd23f',nose:'#3a2e33',pads:'#3a2e33',tailW:6,tail:'#1f1f24',cat:true,hunter:true,spd:1.7,jump:8,mass:1.1,dens:.6,voice:.9,eats:['flopfish','chunk']},
-  grey:{n:'Grey Cat',ic:'🐱',s:1.05,bl:12,ll:13,hr:10,br:11,body:'#8e949c',belly:'#c9ced4',dark:'#6b7178',ear:'#d9a9a9',eye:'#ff9f1c',nose:'#d98a8a',pads:'#d98a8a',stripes:'#70767e',tailW:7,tail:'#8e949c',cat:true,hunter:true,spd:1.5,jump:7,mass:1.3,dens:.6,voice:.85,eats:['flopfish','chunk']},
+  vex:{n:'Vex',pet:1,gentle:true,ic:'🐱',s:.9,bl:11,ll:15,hr:10,br:11,body:'#f3dcbf',belly:'#fdf3e6',dark:'#e2bf98',ear:'#f6c9c4',eye:'#7fb6d8',nose:'#f2a7a7',pads:'#f2a2a8',fluffy:true,tailW:9,tail:'#f6e2c8',cat:true,hunter:true,spd:2.5,jump:7,mass:1.1,dens:.6,voice:1.25,eats:['flopfish','chunk','cochalf']},
+  orange:{n:'Orange Cat',ic:'🐈',s:1,bl:12,ll:14,hr:9.5,br:10.5,body:'#e8892f',belly:'#f6d2a8',dark:'#b8611c',ear:'#f2b0a0',eye:'#9acd32',nose:'#e88a8a',pads:'#3a2a2a',stripes:'#b8611c',tailW:6,tail:'#e8892f',cat:true,hunter:true,spd:2.5,jump:7.5,mass:1.2,dens:.6,voice:1,eats:['flopfish','chunk']},
+  black:{n:'Black Cat',ic:'🐈‍⬛',s:1,bl:12,ll:14,hr:9.5,br:10.5,body:'#1f1f24',belly:'#2a2a30',dark:'#111114',ear:'#3a2e33',eye:'#ffd23f',nose:'#3a2e33',pads:'#3a2e33',tailW:6,tail:'#1f1f24',cat:true,hunter:true,spd:2.5,jump:8,mass:1.1,dens:.6,voice:.9,eats:['flopfish','chunk']},
+  grey:{n:'Grey Cat',ic:'🐱',s:1.05,bl:12,ll:13,hr:10,br:11,body:'#8e949c',belly:'#c9ced4',dark:'#6b7178',ear:'#d9a9a9',eye:'#ff9f1c',nose:'#d98a8a',pads:'#d98a8a',stripes:'#70767e',tailW:7,tail:'#8e949c',cat:true,hunter:true,spd:2.5,jump:7,mass:1.3,dens:.6,voice:.85,eats:['flopfish','chunk']},
   dog:{n:'Dog',ic:'🐕',s:1.25,bl:14,ll:16,hr:11,br:12,body:'#d9a45a',belly:'#f2d7a8',dark:'#a8742e',ear:'#a8742e',eye:'#3a2414',nose:'#1f1f1f',pads:'#3a2a2a',flop:true,snout:1,tailW:5,tail:'#d9a45a',dog:true,spd:2,jump:6.5,mass:2.2,dens:.5,swim:true,voice:1,eats:['chunk','apple','melon']},
   bunny:{n:'Bunny',ic:'🐇',s:.85,bl:9,ll:9,hr:9,br:11,body:'#f4f1ec',belly:'#ffffff',dark:'#dcd6cc',ear:'#f6c3c8',eye:'#c0392b',nose:'#f29aa8',pads:'#e9b3b8',longEar:true,puff:true,tailW:0,tail:'#ffffff',hopper:true,spd:1.4,jump:6,mass:.8,dens:.6,voice:1.6,eats:['berry','apple','seed','chunk','pumpkin']},
   mouse:{n:'Mouse',ic:'🐁',s:.5,bl:9,ll:6,hr:8,br:9,body:'#9a8f86',belly:'#d9d0c6',dark:'#7a7068',ear:'#f2b0b8',eye:'#111111',nose:'#f29aa8',pads:'#f2b0b8',roundEar:true,tailW:2,tail:'#e8b0b0',thinTail:true,mouse:true,spd:2.4,jump:5,mass:.3,dens:.6,voice:2.2,eats:['seed','berry','chunk','cochalf']},
@@ -2873,7 +2873,7 @@ function makeAnimal(kind,x,y,f=1){
   b.C=P2(d.bl,0,d.br*.85,'body');b.Hp=P2(-d.bl,0,d.br*.85,'body');b.Hd=P2(d.bl+d.hr*1.25,-d.hr*1.05,d.hr,'head');
   b.FK=P2(d.bl+1,L*.5,2.6,'legF');b.FF=P2(d.bl,L,3.2,'legF',{fric:.85});
   b.BK=P2(-d.bl-2,L*.5,2.6,'legB');b.BF=P2(-d.bl,L,3.2,'legB',{fric:.85});
-  b.T1=P2(-d.bl-7,-4,2.5,'tail',{noCol:true,area:.4});b.T2=P2(-d.bl-14,-10,2.5,'tail',{noCol:true,area:.4});b.T3=P2(-d.bl-19,-18,2.5,'tail',{noCol:true,area:.4});
+  b.T1=P2(-d.bl-7,-4,2.5,'tail',{noCol:true,area:.4,fric:.01});b.T2=P2(-d.bl-14,-10,2.5,'tail',{noCol:true,area:.4,fric:.01});b.T3=P2(-d.bl-19,-18,2.5,'tail',{noCol:true,area:.4,fric:.01});
   const {C,Hp,Hd,FK,FF,BK,BF,T1,T2,T3}=b;
   const j=(a,c,k,joint,min)=>{stick(b,a,c,k);const st=b.st[b.st.length-1];st.j=joint||'';if(min)st.min=true;return st};
   j(C,Hp,1);j(C,Hd,1);j(Hp,Hd,.3);
@@ -2989,7 +2989,7 @@ function animalAI(b,dt){
   if(legs<2)run=0;
   if(d.hopper&&walk){if(Math.random()<(d.frog?.012:.03)*dt&&FF.touch)animalJump(b,b.f*d.spd*(run?2:1.3),d.jump*(run?.9:.7)*str)}
   else if(walk&&legs){
-    const want=b.f*d.spd*s*(1+run)*(d.turtle?.6:1)*(legs<2?.4:1);b.ph+=dt*.28*(1+run);
+    const want=b.f*d.spd*1.3*Math.max(s,1)*(1+run)*(d.turtle?.6:1)*(legs<2?.4:1);b.ph+=dt*.28*(1+run);
     if(terrainOn&&tH(C.x)>2){ // walking on a slope: push along the hill, and help a bit going uphill
       const dg=(gAt(C.x+6)-gAt(C.x-6))/12,l=Math.hypot(1,dg),tx=1/l,ty=dg/l;
       for(const p of [C,Hp,Hd,FF,BF]){const[vx,vy]=vel(p),along=vx*tx+vy*ty;addVel(p,(want-along)*.25*dt*tx,(want-along)*.25*dt*ty);if(want*dg<0)addVel(p,0,-G*.5*Math.min(1,Math.abs(ty))*dt)}
@@ -3006,6 +3006,8 @@ function animalAI(b,dt){
   addVel(Hd,(C.x+(shell?f*2*s:hx)-Hd.x)*k*.8,(C.y+(shell?0:hy)-Hd.y)*k*.8);
   if(att.legF){addVel(FF,(C.x+st*6*s-FF.x)*k*.5,(C.y+dn*(cH-lift*4*s)-FF.y)*k*.3);addVel(FK,(C.x+f*2*s+st*3*s-FK.x)*k*.4,(C.y+dn*cH*.5-FK.y)*k*.4)}
   if(att.legB){addVel(BF,(Hp.x-st*6*s-BF.x)*k*.5,(Hp.y+dn*(hH-lift*4*s)-BF.y)*k*.3);addVel(BK,(Hp.x-f*3*s-st*3*s-BK.x)*k*.4,(Hp.y+dn*hH*.5-BK.y)*k*.4)}
+  // feet swing forward with the walk (so small animals like cats don't shuffle on the spot)
+  if(walk&&!d.hopper&&legs){const want2=b.f*d.spd*1.3*Math.max(s,1)*(1+run)*(d.turtle?.6:1);for(const p of [FF,BF]){const[vx]=vel(p);addVel(p,(want2-vx)*.1*dt*(.35+lift),0)}}
   for(const p of [C,Hp,Hd]){const rvx=(p.x-p.px)-(FF.x-FF.px),rvy=(p.y-p.py)-(FF.y-FF.py);addVel(p,-rvx*.04,-rvy*.06)}
   // pounce landing: bat the bird (cartoon swat — it squawks and flies off)
   if(a==='pounce'&&tg&&b.coolT<=0){const q=tg.type==='bird'?tg.U:tg.C;
