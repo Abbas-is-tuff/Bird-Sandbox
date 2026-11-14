@@ -204,7 +204,7 @@ function makeBird(def,x,y,f=1){
   return b;
 }
 function breakLimb(b,name){
-  if(!b.att[name]||b.def.mega)return;b.att[name]=false;
+  if(!b.att[name])return;b.att[name]=false;
   b.st=b.st.filter(s=>!s.j.split(' ').includes(name));
   const p=name==='wing'?b.E:name==='leg1'?b.K1:b.K2;
   detachParts(b,name==='wing'?[b.E,b.Wt]:name==='leg1'?[b.K1,b.F1]:[b.K2,b.F2],'bird');
@@ -1107,7 +1107,7 @@ function flyStep(b,dt,grounded){
 }
 function hurt(b,d,quiet){
   if(!b.alive){if(d>4)feathers(b,Math.min(5,d/8));return}
-  d*=.45*(b.def.mega?.06:b.def.strong?.35:1); // tougher birds (Abbas is extra tough 💪, Lemon is a tank 🛡️)
+  d*=.45*(b.def.mega?.15:b.def.strong?.35:1); // tougher birds (Abbas is extra tough 💪, Lemon is a tank 🛡️)
   b.lastHurtT=simTime;
   if(atk&&atk!==b&&isCreature(atk)){b.lastAtk=atk;b.lastAtkT=simTime}
   b.health-=d;if(d>.6&&b.health>0)emoHurt(b,d);b.hurtT=3;b.sleep=false;
@@ -1116,7 +1116,7 @@ function hurt(b,d,quiet){
   if(b.health<=0)die(b);else if(!quiet)squawk(b.def.pitch,b.U.x);
 }
 function die(b){
-  if(!b.alive)return;if(b.def.mega&&b.health>0){hurt(b,120,true);if(b.health>0){const q=b.U;fx.push({t:'text',x:q.x,y:q.y-34,vy:-.6,life:1.2,txt:'🛡️ Lemon shrugs it off'});return}}emoDeath(b);
+  if(!b.alive)return;emoDeath(b);
   b.health=0;b.alive=false;b.flyT=0;b.stun=0;b.sleep=false;deaths++;
   feathers(b,16);deathSound(b.def.pitch,b.U.x);
   fx.push({t:'ghost',x:b.H.x,y:b.H.y,vy:-.9,life:1,b});
@@ -4974,11 +4974,11 @@ function fixInj(b,part,silent){
 function fixAllInj(b){if(b.inj)for(const p of Object.keys(b.inj))fixInj(b,p,true);b.inj={}}
 // impacts & yanks -> injuries (called every step)
 function injuryCheck(b,mx){
-  if(b.dead||!b.att||frameNo-b.born<10||(b.def&&b.def.mega))return;
+  if(b.dead||!b.att||frameNo-b.born<10)return;
   const limbs=b.type==='bird'?['wing','leg1','leg2']:['legF','legB','tail'];
   for(const part of limbs){if(!b.att[part])continue;
     const v=mx?mx[part]||0:0;
-    if(!b.dragT&&v>(b.def.strong?32:22)&&!(b.toughT>0)){const r=Math.random(),c=(v-22)/16;
+    if(!b.dragT&&v>(b.def.mega?36:b.def.strong?32:22)&&!(b.toughT>0)){const r=Math.random(),c=(v-22)/16;
       if(r<c*.35)injure(b,part,v>29&&part!=='tail'?'broken':Math.random()<.5?'torn':'disl')}
     const J=injJoint(b,part);if(!J)continue;const L0=(b.inj&&b.inj[part]?b.inj[part].len0:J.len),d=Math.hypot(J.a.x-J.b.x,J.a.y-J.b.y);
     if(d>L0*1.75&&Math.random()<.25)injure(b,part,'torn');
