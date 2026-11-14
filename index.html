@@ -480,7 +480,7 @@ function spawn(id,x,y){
     case 'pinata':{const near=pick(x,y,25);let anc;if(near&&!['pinata','bird'].includes(near.body.type))anc=near;else{const a=add(single('anchor',x,Math.min(y,groundY-120),4,{pinned:true,noCol:true}));anc=a.ps[0]}
       b=add(single('pinata',anc.x,anc.y+60,16,{im:.5,fric:.4,dens:.5,rest:.3},{hp:100,col:['#ff4d6d','#ffd23f','#4cc9f0','#8ac926'][(Math.random()*4)|0]}));ropes.push({a:anc,b:b.ps[0],len:56});return b}
     case 'tower':buildTower(x);return;
-    case 'sling':if(slings.length<3){makeSling(x,surfaceAt(x,y));woodKnock(x,12)}return;
+    case 'sling':if(slings.length<8){makeSling(x,surfaceAt(x,y));woodKnock(x,12)}return;
     case 'conveyor':walls.push({x:x-80,y:snapY(x,y,14),w:160,h:14,conv:true,dir:1});woodKnock(x,10);return;
     case 'piano':{const x0=x-92,y0=snapY(x,y,12);for(let i=0;i<8;i++)walls.push({x:x0+i*23,y:y0,w:22,h:12,key:i,lit:0});playNote(0,x);return}
     case 'sprinkler':if(sprinklers.length<4)makeSprinkler(x,surfaceAt(x,y));return;
@@ -2126,7 +2126,10 @@ function drawFan(c,b){
 
 /* =================== SLINGSHOT, TOWER, PORTALS =================== */
 let slings=[],portals=[],portalPending=null;
-function makeSling(x,base=groundY){const q={x:x,y:base-165,base};slings.push(q);return q}
+const SLING_SIZES=[['small','Small',.45],['medium','Medium',.7],['large','Large',1],['mega','Mega Large',1.6],['extreme','Extremely Large',2.4],['giant','Extra Giant',3.6]];
+const SLING_ITEMS=SLING_SIZES.map(([k,n,sc])=>({id:'sling:'+k,ic:'🪃',n:n+' slingshot',h:'<b>'+n+' slingshot</b>: grab a bird or object, pull it back from the fork and let go!'+(sc>=2.4?' 🚀 Launches things REALLY far':'')}));
+let slingSc=1;
+function makeSling(x,base=groundY){const sc=slingSc;const q={x:x,y:base-165*sc,base,sc};slings.push(q);return q}
 function launchFromSling(d){
   const q=d.sling,b=d.p.body,c=d.p,dx=q.x-c.x,dy=q.y-c.y,dd=Math.hypot(dx,dy);if(dd<18||b.dead)return;
   const k=.21;for(const p of b.ps){if(p.pinned)continue;p.px=p.x-dx*k*DT;p.py=p.y-dy*k*DT;p.lvx=dx*k;p.lvy=dy*k}
@@ -2135,19 +2138,19 @@ function launchFromSling(d){
 }
 function drawSlings(){
   for(const q of slings){
-    const A=30,base=q.base??groundY,fy=q.y+58;let ld=null;for(const d of drags.values())if(d.sling===q)ld=d.p;
+    const S=q.sc||1,A=30*S,base=q.base??groundY,fy=q.y+58*S;let ld=null;for(const d of drags.values())if(d.sling===q)ld=d.p;
     // back band
-    ctx.strokeStyle='#4a2208';ctx.lineCap='round';ctx.lineWidth=7;ctx.beginPath();ctx.moveTo(q.x+A,q.y);if(ld)ctx.lineTo(ld.x,ld.y);else ctx.quadraticCurveTo(q.x,q.y+16,q.x,q.y+14);ctx.stroke();
+    ctx.strokeStyle='#4a2208';ctx.lineCap='round';ctx.lineWidth=Math.max(3,7*S);ctx.beginPath();ctx.moveTo(q.x+A,q.y);if(ld)ctx.lineTo(ld.x,ld.y);else ctx.quadraticCurveTo(q.x,q.y+16*S,q.x,q.y+14*S);ctx.stroke();
     // wooden Y
-    for(const [w,col] of [[20,mix('#1a1006','#5a3414',light)],[14,mix('#2a1a0c','#8a5428',light)]]){ctx.strokeStyle=col;ctx.lineWidth=w;ctx.beginPath();ctx.moveTo(q.x,base);ctx.lineTo(q.x,fy);ctx.quadraticCurveTo(q.x-A*.6,fy-12,q.x-A,q.y);ctx.moveTo(q.x,fy);ctx.quadraticCurveTo(q.x+A*.6,fy-12,q.x+A,q.y);ctx.stroke()}
-    ctx.strokeStyle=mix('#3a2410','#c9883a',light);ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(q.x-4,base-6);ctx.lineTo(q.x-4,fy+10);ctx.stroke();
+    for(const [w,col] of [[20,mix('#1a1006','#5a3414',light)],[14,mix('#2a1a0c','#8a5428',light)]]){ctx.strokeStyle=col;ctx.lineWidth=w*S;ctx.beginPath();ctx.moveTo(q.x,base);ctx.lineTo(q.x,fy);ctx.quadraticCurveTo(q.x-A*.6,fy-12*S,q.x-A,q.y);ctx.moveTo(q.x,fy);ctx.quadraticCurveTo(q.x+A*.6,fy-12*S,q.x+A,q.y);ctx.stroke()}
+    ctx.strokeStyle=mix('#3a2410','#c9883a',light);ctx.lineWidth=4*S;ctx.beginPath();ctx.moveTo(q.x-4*S,base-6);ctx.lineTo(q.x-4*S,fy+10*S);ctx.stroke();
     // grip wrap
-    ctx.fillStyle='#7a2a1a';for(let i=0;i<4;i++){ctx.fillRect(q.x-10,fy+20+i*9,20,5)}
+    ctx.fillStyle='#7a2a1a';for(let i=0;i<4;i++){ctx.fillRect(q.x-10*S,fy+(20+i*9)*S,20*S,5*S)}
     // front band + pouch
-    ctx.strokeStyle='#5a2d0c';ctx.lineWidth=7;ctx.beginPath();ctx.moveTo(q.x-A,q.y);
-    if(ld){ctx.lineTo(ld.x,ld.y);ctx.stroke();ctx.fillStyle='#3a1a08';ctx.beginPath();ctx.ellipse(ld.x,ld.y,11,8,Math.atan2(ld.y-q.y,ld.x-q.x)+Math.PI/2,0,TAU);ctx.fill()}
-    else{ctx.quadraticCurveTo(q.x,q.y+16,q.x+A,q.y);ctx.stroke();ctx.fillStyle='#3a1a08';ctx.beginPath();ctx.ellipse(q.x,q.y+11,12,6,0,0,TAU);ctx.fill()}
-    ctx.fillStyle=mix('#1a1006','#5a3414',light);circle(ctx,q.x-A,q.y,8);circle(ctx,q.x+A,q.y,8);
+    ctx.strokeStyle='#5a2d0c';ctx.lineWidth=Math.max(3,7*S);ctx.beginPath();ctx.moveTo(q.x-A,q.y);
+    if(ld){ctx.lineTo(ld.x,ld.y);ctx.stroke();ctx.fillStyle='#3a1a08';ctx.beginPath();ctx.ellipse(ld.x,ld.y,Math.max(6,11*S),Math.max(4,8*S),Math.atan2(ld.y-q.y,ld.x-q.x)+Math.PI/2,0,TAU);ctx.fill()}
+    else{ctx.quadraticCurveTo(q.x,q.y+16*S,q.x+A,q.y);ctx.stroke();ctx.fillStyle='#3a1a08';ctx.beginPath();ctx.ellipse(q.x,q.y+11*S,12*S,6*S,0,0,TAU);ctx.fill()}
+    ctx.fillStyle=mix('#1a1006','#5a3414',light);circle(ctx,q.x-A,q.y,8*S);circle(ctx,q.x+A,q.y,8*S);
   }
 }
 function buildTower(x){
@@ -3554,7 +3557,7 @@ function openMapMenu(first){
 function searchList(q){
   q=q.trim().toLowerCase();if(!q)return null;
   const all=[...BIRDS.map((d,i)=>({id:'bird:'+i,n:d.name,kind:'spawn',icon:icons&&icons[i],h:'Tap to place <b>'+d.name+'</b>'})),
-    ...[...ANIMAL_TAB,...ITEMS,...WEAPONS,...BOMBS_TAB,...CAR_ITEMS,...PLANTS,...BUILD_TAB,...WORLD.filter(it=>it.id!=='sling')].map(it=>({kind:'spawn',...it})),...[...TOOLS,...POWERS].map(t=>({...t,kind:'tool'}))];
+    ...[...ANIMAL_TAB,...ITEMS,...WEAPONS,...BOMBS_TAB,...CAR_ITEMS,...PLANTS,...BUILD_TAB,...WORLD.filter(it=>!it.id.startsWith('sling'))].map(it=>({kind:'spawn',...it})),...[...TOOLS,...POWERS].map(t=>({...t,kind:'tool'}))];
   return all.filter(it=>(it.n||'').toLowerCase().includes(q));
 }
 
@@ -3766,6 +3769,7 @@ BIRDS.push({name:'Kauaʻi ʻŌʻō',s:.8,bk:1.6,body:'#1e1c1a',belly:'#4a3a2e',w
 let pendingSpawn=null;
 function doSpawn(ps,withDrag){
   pendingSpawn=null;pushUndo();const x=ps.x,y=ps.y,id=ps.id;
+  if(id.startsWith('sling:')){const z=SLING_SIZES.find(a=>'sling:'+a[0]===id);slingSc=z?z[2]:1;spawn('sling',x,y);slingSc=1;return}
   if(id==='tree'||id==='house'||id==='lamp'||id==='feeder'||id==='sling'||id==='mirror'||id==='sprinkler'){spawn(id,x,y);return}
   const b=spawn(id,x,Math.min(y,(terrainOn?gAt(x):groundY)-20));
   if(withDrag&&b&&b.ps&&!['balloon','bell','swing','campfire','pinata'].includes(b.type))drags.set(ps.pid,{p:b.type==='bird'?b.U:b.type==='animal'?b.C:b.ps[0],x:ps.wx,y:ps.wy});
@@ -4787,7 +4791,7 @@ cv.addEventListener('pointerdown',e=>{
       const ri=ropes.findIndex(r=>distSeg(x,y,r.a,r.b)<14);if(ri>=0){ropes.splice(ri,1);pop(1.2,x);break}
       const sq=sprinklers.find(q=>Math.abs(x-q.x)<22&&y>(q.base??groundY)-40&&y<(q.base??groundY)+15);if(sq){sq.removed=true;sprinklers=sprinklers.filter(o=>o!==sq);pop(.7,x);break}
       const lp=lamps.find(l=>Math.abs(x-l.x)<20&&y>l.y-22&&y<(l.base??groundY));if(lp){walls=walls.filter(w=>w.lamp!==lp);lamps=lamps.filter(o=>o!==lp);pop(.7,x);break}
-      const sl=slings.find(q=>Math.abs(x-q.x)<45&&y>q.y-25&&y<(q.base??groundY));if(sl){slings=slings.filter(o=>o!==sl);for(const d of drags.values())if(d.sling===sl)d.sling=null;pop(.7,x);break}
+      const sl=slings.find(q=>Math.abs(x-q.x)<45*(q.sc||1)&&y>q.y-25*(q.sc||1)&&y<(q.base??groundY));if(sl){slings=slings.filter(o=>o!==sl);for(const d of drags.values())if(d.sling===sl)d.sling=null;pop(.7,x);break}
       const pti=portals.findIndex(pr=>Math.hypot(x-pr.a.x,y-pr.a.y)<30||Math.hypot(x-pr.b.x,y-pr.b.y)<30);if(pti>=0){portals.splice(pti,1);pop(.7,x);break}
       const fd=feeders.find(f=>Math.abs(x-f.x)<36&&y>f.y-75&&y<(f.base??groundY));if(fd){removeFeeder(fd);pop(.7,x);break}
       const mi=mirrors.findIndex(m=>Math.abs(x-m.x)<26&&y>(m.base??groundY)-90&&y<(m.base??groundY)+10);if(mi>=0){mirrors[mi].removed=true;mirrors.splice(mi,1);pop(.7,x);break}
@@ -4830,8 +4834,8 @@ cv.addEventListener('pointermove',e=>{
   if(gestureMove(e))return;
   if(holdTool&&holdTool.pid===e.pointerId){holdTool.vx=WX(e)-holdTool.x;holdTool.x=WX(e);holdTool.y=WY(e)}
   const d=drags.get(e.pointerId);if(d){d.x=WX(e);d.y=WY(e);
-    if(!d.sling&&!d.p.pinned)for(const q of slings)if(Math.hypot(d.p.x-q.x,d.p.y-q.y)<90){d.sling=q;break}
-    if(d.sling){const q=d.sling,dx=d.x-q.x,dy=d.y-q.y,dd=Math.hypot(dx,dy);if(dd>520)d.sling=null;else if(dd>260){d.x=q.x+dx/dd*260;d.y=q.y+dy/dd*260}}}
+    if(!d.sling&&!d.p.pinned)for(const q of slings)if(Math.hypot(d.p.x-q.x,d.p.y-q.y)<Math.max(45,90*(q.sc||1))){d.sling=q;break}
+    if(d.sling){const q=d.sling,dx=d.x-q.x,dy=d.y-q.y,dd=Math.hypot(dx,dy);const M=260*(q.sc||1);if(dd>M*2)d.sling=null;else if(dd>M){d.x=q.x+dx/dd*M;d.y=q.y+dy/dd*M}}}
   if(wallDraw&&wallDraw.id===e.pointerId){wallDraw.x1=WX(e);wallDraw.y1=Math.min(WY(e),groundY)}
   if(pondDraw&&pondDraw.id===e.pointerId)pondDraw.x1=WX(e);
   if(xform&&xform.id===e.pointerId){
@@ -4934,7 +4938,8 @@ const POWERS=[
 ITEMS.push(...NEW_ITEMS,...MORE_ITEMS);
 const WEAPON_IDS=['cannon','anvil'],BOMB_IDS=['bomb','tnt'];
 const BOMBS_TAB=[...BOMB_IDS.map(id=>ITEMS.find(it=>it.id===id)).filter(Boolean),...BOMB_ITEMS];for(const id of BOMB_IDS){const i=ITEMS.findIndex(it=>it.id===id);if(i>=0)ITEMS.splice(i,1)}
-const WEAPONS=[...GUN_ITEMS,...MORE_GUN_ITEMS,...SWORD_ITEMS,...WEAPON_IDS.map(id=>ITEMS.find(it=>it.id===id)).filter(Boolean),...[WORLD.find(it=>it.id==='sling')].filter(Boolean).map(it=>({...it}))];
+{const i=WORLD.findIndex(it=>it.id==='sling');if(i>=0)WORLD.splice(i,1,...SLING_ITEMS)}
+const WEAPONS=[...GUN_ITEMS,...MORE_GUN_ITEMS,...SWORD_ITEMS,...WEAPON_IDS.map(id=>ITEMS.find(it=>it.id===id)).filter(Boolean),...SLING_ITEMS];
 for(const id of WEAPON_IDS){const i=ITEMS.findIndex(it=>it.id===id);if(i>=0)ITEMS.splice(i,1)}TOOLS.push(...CAM_TOOLS);
 let tab='birds';
 const itemsEl=document.getElementById('items'),hintEl=document.getElementById('hint'),setEl=document.getElementById('settings');
@@ -5003,7 +5008,7 @@ $('bRain').onclick=()=>{unlockAudio();pushUndo();for(let i=0;i<6;i++){const d=BI
 $('bHeal').onclick=()=>{unlockAudio();pushUndo();for(const b of bodies){if(b.type==='bird')heal(b);else if(b.type==='animal')healAnimal(b)}toast('Everyone revived 💉')};
 function saveWorld(){
   const idx=d=>BIRDS.indexOf(d);
-  const data={v:1,tod,S:{...S},walls:walls.filter(w=>!w.trunk&&!w.house&&!w.feeder&&!w.lamp).map(w=>({...w})),lamps:lamps.map(l=>({x:l.x,base:l.base})),sprinklers:sprinklers.map(q=>({x:q.x,base:q.base})),slings:slings.map(q=>({x:q.x,base:q.base})),portals:portals.map(pr=>({a:pr.a,b:pr.b})),mirrors:mirrors.map(m=>({x:m.x,base:m.base})),feeders:feeders.map(f=>({x:f.x,base:f.base})),ponds:ponds.map(p=>({x:p.x,w:p.w})),trees:trees.map(t=>({x:t.x,base:t.base})),houses:houses.map(h=>({x:h.x,base:h.base})),
+  const data={v:1,tod,S:{...S},walls:walls.filter(w=>!w.trunk&&!w.house&&!w.feeder&&!w.lamp).map(w=>({...w})),lamps:lamps.map(l=>({x:l.x,base:l.base})),sprinklers:sprinklers.map(q=>({x:q.x,base:q.base})),slings:slings.map(q=>({x:q.x,base:q.base,sc:q.sc||1})),portals:portals.map(pr=>({a:pr.a,b:pr.b})),mirrors:mirrors.map(m=>({x:m.x,base:m.base})),feeders:feeders.map(f=>({x:f.x,base:f.base})),ponds:ponds.map(p=>({x:p.x,w:p.w})),trees:trees.map(t=>({x:t.x,base:t.base})),houses:houses.map(h=>({x:h.x,base:h.base})),
     bodies:bodies.concat(houses.flatMap(h=>h.occ)).filter(b=>!['branch','anchor','piece','shard','chunk','seed','bell','swing','meteor','pinata'].includes(b.type)).map(b=>{const c=centroid(b);
       const id=b.type==='egg'?'egg:'+b.defIdx:b.type==='bird'?'bird:'+idx(b.def):b.type==='furn'?b.kind:b.type==='plank'&&b.cols<8?null:b.type==='seesaw'?'seesaw':b.type==='animal'?'animal:'+b.kind:b.type==='block'?'blkraw:'+b.mat:b.type==='sword'?'sword:'+b.kind:b.type==='gun'?'gun:'+b.kind:b.type==='car'?'car:'+b.kind:b.type==='xpl'?(XPL[b.kind].hidden?null:'xpl:'+b.kind):b.type;
       return id?{id,x:c.x,y:c.y,sc:b.scale||1,dead:b.type==='bird'&&!b.alive,f:b.f,name:b.name,hat:b.hat,paint:b.paint}:null}).filter(Boolean)};
@@ -5016,7 +5021,7 @@ function loadWorld(){
   xform=null;bodies=[];ropes=[];walls=[];ponds=[];trees=[];houses=[];fx=[];drags.clear();tieA=null;inspected=null;mirrors=[];feeders=[];lamps=[];sprinklers=[];slings=[];portals=[];portalPending=null;holes=[];tornados=[];waterDrops=[];quakeT=0;holdTool=null;
   Object.assign(S,data.S||{});tod=data.tod??tod;
   for(const w of data.walls)walls.push(w);for(const p of data.ponds)makePond(p.x+p.w/2,p.w);const XB=o=>typeof o==='number'?[o,groundY]:[o.x,o.base??groundY];
-  for(const o of data.trees)makeTree(...XB(o));for(const o of data.houses||[])makeHouse(...XB(o));for(const o of data.mirrors||[]){const[x,b]=XB(o);mirrors.push({x,base:b})}for(const o of data.feeders||[])makeFeeder(...XB(o));for(const o of data.lamps||[])makeLamp(...XB(o));for(const o of data.sprinklers||[])makeSprinkler(...XB(o));for(const o of data.slings||[])makeSling(...XB(o));for(const pr of data.portals||[])portals.push(pr);
+  for(const o of data.trees)makeTree(...XB(o));for(const o of data.houses||[])makeHouse(...XB(o));for(const o of data.mirrors||[]){const[x,b]=XB(o);mirrors.push({x,base:b})}for(const o of data.feeders||[])makeFeeder(...XB(o));for(const o of data.lamps||[])makeLamp(...XB(o));for(const o of data.sprinklers||[])makeSprinkler(...XB(o));for(const o of data.slings||[]){slingSc=o.sc||1;makeSling(...XB(o));slingSc=1};for(const pr of data.portals||[])portals.push(pr);
   natureLoad(data);
   for(const o of data.bodies){
     if(o.id==='seesaw'){add(makeSeesaw(o.x,o.y));continue}

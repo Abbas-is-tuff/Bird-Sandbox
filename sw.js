@@ -1,7 +1,7 @@
 // Bird Sandbox offline support: keeps a copy of the game on the device.
 // Opens instantly from the cache (works with no internet) and quietly
 // downloads the newest version in the background whenever you are online.
-const CACHE = 'bird-sandbox-v21';
+const CACHE = 'bird-sandbox-v22';
 const FILES = ['./', './index.html', './manifest.webmanifest', './logo/icon-180.png', './logo/icon-192.png', './logo/icon-512.png'];
 
 self.addEventListener('install', e => {
