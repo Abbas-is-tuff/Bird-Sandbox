@@ -1376,7 +1376,8 @@ function drawBird(c,b){
   // head (orientation from the beak point)
   const hs=s*(def.hs||1),bh=hs*(def.bk||1);
   let hfx=Bk.x-H.x,hfy=Bk.y-H.y;const hfl=Math.hypot(hfx,hfy)||1;hfx/=hfl;hfy/=hfl;
-  const ux=f*hfy,uy=-f*hfx;
+  // the top of the head points away from the body/legs, so it never ends up upside down
+  let ux=hfy,uy=-hfx;{const vx=H.x-(b.L.x+U.x)/2,vy=H.y-(b.L.y+U.y)/2;if(ux*vx+uy*vy<0||(Math.abs(ux*vx+uy*vy)<1e-3&&uy>0)){ux=-ux;uy=-uy}}
   if(def.crest){c.strokeStyle=def.crest;c.lineWidth=2.6*hs;c.lineCap='round';c.beginPath();
     const raise=b.hurtT>2.5||b.callVis>0?1.25:b.sleep?.6:1;
     for(let i=0;i<3;i++){const sx=H.x+ux*6*hs-hfx*(i*1.6-.5)*hs,sy=H.y+uy*6*hs-hfy*(i*1.6-.5)*hs;
