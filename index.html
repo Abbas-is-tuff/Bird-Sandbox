@@ -3787,7 +3787,7 @@ BIRDS.push({name:'Kauaʻi ʻŌʻō',s:.8,bk:1.6,body:'#1e1c1a',belly:'#4a3a2e',w
 let pendingSpawn=null;
 function doSpawn(ps,withDrag){
   pendingSpawn=null;pushUndo();const x=ps.x,y=ps.y,id=ps.id;
-  if(id==='aa'){if(aaSites.length<6){makeAA(x,surfaceAt(x,y));tone('square',200,400,.2,.05,null,x)}return}
+  if(id==='aa'){if(aaSites.length<50){makeAA(x,surfaceAt(x,y));tone('square',200,400,.2,.05,null,x)}else toast('🛡️ Max 50 air defenses');return}
   if(id.startsWith('sling:')){const z=SLING_SIZES.find(a=>'sling:'+a[0]===id);slingSc=z?z[2]:1;spawn('sling',x,y);slingSc=1;return}
   if(id==='tree'||id==='house'||id==='lamp'||id==='feeder'||id==='sling'||id==='mirror'||id==='sprinkler'){spawn(id,x,y);return}
   const b=spawn(id,x,Math.min(y,(terrainOn?gAt(x):groundY)-20));
