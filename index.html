@@ -421,7 +421,7 @@ function rotateBody(b,da){
   for(const p of b.ps){if(p.pinned&&b.type==='branch')continue;const dx=p.x-c.x,dy=p.y-c.y;p.x=c.x+dx*co-dy*si;p.y=c.y+dx*si+dy*co;p.px=p.x;p.py=p.y;p.lvx=p.lvy=0}
 }
 function scaleBody(b,k){
-  const ns=clamp((b.scale||1)*k,.35,3.5);k=ns/(b.scale||1);if(Math.abs(k-1)<1e-4)return;b.scale=ns;
+  const ns=clamp((b.scale||1)*k,.1,15);k=ns/(b.scale||1);if(Math.abs(k-1)<1e-4)return;b.scale=ns;
   const c=centroid(b);
   for(const p of b.ps){p.x=c.x+(p.x-c.x)*k;p.y=c.y+(p.y-c.y)*k;p.px=p.x;p.py=p.y;p.r*=k;p.area*=k;p.im/=k*k;p.lvx=p.lvy=0}
   for(const st of b.st)st.len*=k;
@@ -577,7 +577,7 @@ function step(dt,sub){
   for(const b of bodies)b.dragT=0;
   for(const d of drags.values())d.p.body.dragT=1;
   spinStep();
-  if(xform&&!xform.b.dead){xform.b.held=true;xform.b.heldF=frameNo}
+  if(xform&&xform.b&&!xform.b.dead){xform.b.held=true;xform.b.heldF=frameNo}
   popCount=0;for(const o of bodies)if(o.type==='bird'||o.type==='egg')popCount++;
   natureEarly(dt);updateMachines(dt);updateHouses(dt);updateSprinklers(dt);updatePowers(dt);updatePortals();updateFire(dt);updateFrozen(dt);updateEggs(dt);updateFeeders(dt);
   for(const b of bodies){
@@ -593,7 +593,7 @@ function step(dt,sub){
   for(const p of allP){
     if(p.pinned||p.body.held){p.px=p.x;p.py=p.y;p.touch=false;p.cn=null;continue}
     let vx=(p.x-p.px)*ratio*.9995,vy=(p.y-p.py)*ratio*.9995;
-    const sp=Math.hypot(vx,vy),mx=60*dt;if(sp>mx){vx*=mx/sp;vy*=mx/sp}
+    const lch=p.body.launchT>simTime,sp=Math.hypot(vx,vy),mx=(lch?150:60)*dt;if(sp>mx){vx*=mx/sp;vy*=mx/sp}
     let vxF=vx/dt,vyF=vy/dt;
     // water: buoyancy + drag
     const pd=pondAt(p.x);p.sub=0;
@@ -607,7 +607,7 @@ function step(dt,sub){
     }
     // air resistance + wind (quadratic drag on relative air velocity)
     const rx=windNow*(p.sub>0?.1:1)-vxF,ry=-vyF,rm=Math.hypot(rx,ry);
-    let c=airK*p.area*p.im*rm*dt;if(c>.5)c=.5;
+    let c=airK*p.area*p.im*rm*dt*(lch?.15:1);if(c>.5)c=.5;
     vxF+=rx*c;vyF+=ry*c;
     vx=vxF*dt;vy=vyF*dt;
     p.vx0=vxF;p.vy0=vyF;p.px=p.x;p.py=p.y;
@@ -2132,8 +2132,8 @@ let slingSc=1;
 function makeSling(x,base=groundY){const sc=slingSc;const q={x:x,y:base-165*sc,base,sc};slings.push(q);return q}
 function launchFromSling(d){
   const q=d.sling,b=d.p.body,c=d.p,dx=q.x-c.x,dy=q.y-c.y,dd=Math.hypot(dx,dy);if(dd<18||b.dead)return;
-  const k=.21;for(const p of b.ps){if(p.pinned)continue;p.px=p.x-dx*k*DT;p.py=p.y-dy*k*DT;p.lvx=dx*k;p.lvy=dy*k}
-  b.toughT=3;b.heldF=frameNo;if(b.type==='bird'&&b.alive){b.stun=Math.max(b.stun,1.2);b.flyT=0;b.goal=null;b.sleep=false}
+  const k=.55;for(const p of b.ps){if(p.pinned)continue;p.px=p.x-dx*k*DT;p.py=p.y-dy*k*DT;p.lvx=dx*k;p.lvy=dy*k}
+  b.toughT=5;b.heldF=frameNo;b.launchT=simTime+2.5;fx.push({t:'ring',x:q.x,y:q.y,life:1});shake=Math.max(shake,dd/40);if(b.type==='bird'&&b.alive){b.stun=Math.max(b.stun,1.2);b.flyT=0;b.goal=null;b.sleep=false}
   tone('triangle',180,90,.25,.12,null,q.x);noise(.12,.25,1500,'bandpass',q.x,2);
 }
 function drawSlings(){
@@ -3599,7 +3599,7 @@ function gestureDown(e){
   if(touches.size>=2){
     pendingSpawn=null;
     for(const id of touches.keys()){drags.delete(id);ignoreIds.add(id)}
-    holdTool=null;wallDraw=null;pondDraw=null;if(xform){xform.b.held=false;xform=null}panDrag=null;
+    holdTool=null;wallDraw=null;pondDraw=null;if(xform){if(xform.b)xform.b.held=false;xform=null}panDrag=null;
     const [a,b]=[...touches.values()],mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
     pinch={d0:Math.hypot(a.x-b.x,a.y-b.y)||1,z0:cam.z,wx:mx/cam.z+cam.x,wy:my/cam.z+cam.y};
     return true;
@@ -4358,7 +4358,7 @@ fireGun=function(b){
   fx.push({t:'tracer',x:mx,y:my,x2:h.x,y2:h.y,life:1,col,w:4,laser:true});
   if(!o)return;
   if(g.freeze){freezeBody(o);for(let i=0;i<10;i++)fx.push({t:'spark',x:h.x,y:h.y,vx:rand(-3,3),vy:rand(-3,3),life:.6,col:'#e8fbff'})}
-  if(g.shrink||g.grow){if(o.type!=='branch'&&o.type!=='anchor'){const sc=o.scale||1,k=g.grow?1.25:.8;if((g.grow&&sc<3)||(g.shrink&&sc>.3)){scaleBody(o,k);tone('sine',g.grow?300:900,g.grow?150:1800,.25,.06,null,h.x)}
+  if(g.shrink||g.grow){if(o.type!=='branch'&&o.type!=='anchor'){const sc=o.scale||1,k=g.grow?1.25:.8;if((g.grow&&sc<15)||(g.shrink&&sc>.1)){scaleBody(o,k);tone('sine',g.grow?300:900,g.grow?150:1800,.25,.06,null,h.x)}
     for(let i=0;i<10;i++)fx.push({t:'spark',x:h.x,y:h.y,vx:rand(-3,3),vy:rand(-3,3),life:.6,col})}}
   if(g.paint&&(o.type==='bird'||o.type==='animal')){o.paint=(o.paint==null?0:o.paint+1)%PAINTS.length;o._alKey=null;for(let i=0;i<10;i++)fx.push({t:'drop',x:h.x,y:h.y,vx:rand(-2,2),vy:rand(-3,0),life:.6})}
 };
@@ -4758,7 +4758,8 @@ cv.addEventListener('pointerdown',e=>{
     case 'send':{const p=pick(x,y,24);if(!sendSel){if(p&&p.body.type!=='branch'){sendSel=p.body;toast('📍 Now tap where to send it — pinch to zoom out')}break}
       if(p&&p.body===sendSel){sendSel=null;toast('Cancelled');break}if(!sendSel.dead)sendTo(sendSel,x,y);sendSel=null;break}
     case 'explode':explode(x,y);break;
-    case 'rotate':case 'scale':{const p=pick(x,y,40);if(p&&p.body.type!=='branch'&&p.body.type!=='anchor'){const b=p.body,c=centroid(b);xform={id:e.pointerId,b,mode:mode.id,last:Math.atan2(y-c.y,x-c.x),ly:y}}break}
+    case 'rotate':case 'scale':{const p=pick(x,y,40);if(p&&p.body.type!=='branch'&&p.body.type!=='anchor'){const b=p.body,c=centroid(b);xform={id:e.pointerId,b,mode:mode.id,last:Math.atan2(y-c.y,x-c.x),ly:y}}
+      else if(mode.id==='scale'){const q=slings.find(q=>Math.abs(x-q.x)<45*(q.sc||1)&&y>q.y-25*(q.sc||1)&&y<(q.base??groundY));if(q)xform={id:e.pointerId,b:null,sling:q,mode:'scale',ly:y}}break}
     case 'lightning':{const save=Math.random;lightningAt(x);break}
     case 'pin':{const p=pick(x,y,25);if(p){p.pinned=!p.pinned;p.px=p.x;p.py=p.y;pop(2,x)}break}
     case 'heal':{const p=pick(x,y,40);if(p&&p.body.type==='bird')heal(p.body);else if(p&&p.body.type==='animal')healAnimal(p.body);break}
@@ -4839,9 +4840,9 @@ cv.addEventListener('pointermove',e=>{
   if(wallDraw&&wallDraw.id===e.pointerId){wallDraw.x1=WX(e);wallDraw.y1=Math.min(WY(e),groundY)}
   if(pondDraw&&pondDraw.id===e.pointerId)pondDraw.x1=WX(e);
   if(xform&&xform.id===e.pointerId){
-    const b=xform.b;if(b.dead){xform=null;return}const c=centroid(b);
+    const b=xform.b;if(b&&b.dead){xform=null;return}const c=b?centroid(b):{x:0,y:0};
     if(xform.mode==='rotate'){const a=Math.atan2(WY(e)-c.y,WX(e)-c.x);let da=a-xform.last;xform.last=a;if(da>Math.PI)da-=TAU;if(da<-Math.PI)da+=TAU;rotateBody(b,da)}
-    else{const k=Math.exp(-(WY(e)-xform.ly)*.006);xform.ly=WY(e);scaleBody(b,k);hintEl.innerHTML='Size: <b>'+Math.round((b.scale||1)*100)+'%</b>'}
+    else{const k=Math.exp(-(WY(e)-xform.ly)*.009);xform.ly=WY(e);if(xform.sling){const q=xform.sling,ns=clamp((q.sc||1)*k,.2,8),base=q.base??groundY;q.sc=ns;q.y=base-165*ns;hintEl.innerHTML='Slingshot size: <b>'+Math.round(ns*100)+'%</b>'}else{scaleBody(b,k);hintEl.innerHTML='Size: <b>'+Math.round((b.scale||1)*100)+'%</b> (10% – 1500%)'}}
   }
 });
 function endPtr(e){
@@ -4850,7 +4851,7 @@ function endPtr(e){
   {const d=drags.get(e.pointerId);if(d&&d.sling)launchFromSling(d);
    else if(d&&d.t0&&performance.now()-d.t0<260&&Math.hypot(WX(e)-d.sx,WY(e)-d.sy)<10&&TAPUSE.has(d.p.body.type)&&!d.p.body.dead){activate(d.p.body,WX(e),WY(e));fx.push({t:'ring',x:WX(e),y:WY(e),life:1})}}
   drags.delete(e.pointerId);
-  if(xform&&xform.id===e.pointerId){xform.b.held=false;xform.b.heldF=frameNo;xform=null;if(mode.id==='scale')setHint()}
+  if(xform&&xform.id===e.pointerId){if(xform.b){xform.b.held=false;xform.b.heldF=frameNo}xform=null;if(mode.id==='scale')setHint()}
   if(wallDraw&&wallDraw.id===e.pointerId){const r=normRect(wallDraw);if(r.w>12&&r.h>12)walls.push(r);else if(r.w>12||r.h>12)walls.push({x:r.x,y:r.y,w:Math.max(r.w,14),h:Math.max(r.h,14)});wallDraw=null}
   if(pondDraw&&pondDraw.id===e.pointerId){
     const w=Math.abs(pondDraw.x1-pondDraw.x0),cx=w<40?pondDraw.x0:(pondDraw.x0+pondDraw.x1)/2;
@@ -4916,7 +4917,7 @@ const TOOLS=[
   {id:'paint',ic:'🎨',n:'Paint',h:'<b>Paint</b>: tap a bird to give it new colors'},
   {id:'dup',ic:'📑',n:'Duplicate',h:'Tap anything to <b>duplicate</b> it'},
   {id:'rotate',ic:'🔄',n:'Rotate',h:'Drag around an object to <b>rotate</b> it'},
-  {id:'scale',ic:'↕️',n:'Resize',h:'Drag up on an object to make it <b>bigger</b>, down for smaller'},
+  {id:'scale',ic:'↕️',n:'Resize',h:'Drag up on anything to make it <b>bigger</b>, down for smaller — from 10% up to 1500%! Works on slingshots too'},
   {id:'tie',ic:'🪢',n:'Rope',h:'<b>Rope</b>: tap one thing, then another (or empty sky)'},
   {id:'pin',ic:'📌',n:'Pin',h:'Tap to <b>pin</b> / unpin a part in the air'},
   {id:'heal',ic:'💉',n:'Revive',h:'Tap a bird to <b>revive</b> and heal it (lost limbs stay lost!)'},
