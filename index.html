@@ -5263,15 +5263,20 @@ function birdIcon(def){
   const b=makeBird(def,0,0,1);drawBird(g,b);return c;
 }
 let icons=null;
+// section labels in the Birds tab (your real birds come first, then everyone else)
+let _bsl=null;function birdSepLabel(i){if(!_bsl){_bsl={};const nxt=k=>{while(k<BIRDS.length&&BIRDS[k].pet)k++;return k};
+  const firstOther=BIRDS.findIndex(d=>!d.pet);_bsl[firstOther]='Species →';
+  for(const [k,t] of [[FIRST_NEW_BIRD,'New! →'],[FIRST_NEW_BIRD2,'Newest →'],[FIRST_NEW_BIRD3,'More →'],[FIRST_EXTINCT,'Extinct 🦴 →'],[FIRST_MORE,'Even more birds →']]){const n=nxt(k);if(n<BIRDS.length&&!_bsl[n])_bsl[n]=t}}
+  return _bsl[i]}
 function buildItems(){
   if(!icons)icons=BIRDS.map(birdIcon);
   itemsEl.innerHTML='';
-  const list=tab==='birds'?BIRDS.map((d,i)=>({id:'bird:'+i,n:d.name,kind:'spawn',icon:icons[i],h:'Tap to place <b>'+d.name+'</b> — then drag to fling'})):
+  const list=tab==='birds'?[...BIRDS.map((d,i)=>i).filter(i=>BIRDS[i].pet),...BIRDS.map((d,i)=>i).filter(i=>!BIRDS[i].pet)].map(i=>{const d=BIRDS[i];return{id:'bird:'+i,n:d.name,kind:'spawn',icon:icons[i],h:'Tap to place <b>'+d.name+'</b>'+(d.pet?' (your bird 💛)':'')+' — then drag to fling'}}):
     tab==='weapons'?WEAPONS.map(it=>({...it,kind:'spawn'})):tab==='bombs'?BOMBS_TAB.map(it=>({...it,kind:'spawn'})):tab==='cars'?[...CAR_ITEMS,...ITEMS.filter(it=>it.id==='cart'||it.id==='boat')].map(it=>({...it,kind:'spawn'})):tab==='build'?BUILD_TAB.map(it=>({...it,kind:'spawn'})):tab==='animals'?ANIMAL_TAB.map(it=>({...it,kind:'spawn'})):tab==='plants'?PLANTS.map(it=>({...it,kind:'spawn'})):tab==='items'?ITEMS.map(it=>({...it,kind:'spawn'})):tab==='world'?WORLD.map(it=>({kind:'spawn',...it})):tab==='powers'?POWERS.map(t=>({...t,kind:'tool'})):TOOLS.map(t=>({...t,kind:'tool'}));
   const sres=searchList(searchQ);
   for(const it of (sres||list)){
     if(it.sep){if(!sres){const sp=document.createElement('div');sp.textContent=it.sep;sp.style.cssText='flex:0 0 auto;writing-mode:vertical-rl;transform:rotate(180deg);color:#9fb3cf;font-size:11px;font-weight:700;text-align:center;padding:0 2px';itemsEl.appendChild(sp)}continue}
-    if(!sres&&tab==='birds'&&(it.id==='bird:7'||it.id==='bird:'+FIRST_NEW_BIRD||it.id==='bird:'+FIRST_NEW_BIRD2||it.id==='bird:'+FIRST_NEW_BIRD3||it.id==='bird:'+FIRST_EXTINCT||it.id==='bird:'+FIRST_MORE)){const sp=document.createElement('div');sp.textContent=it.id==='bird:7'?'Species →':it.id==='bird:'+FIRST_NEW_BIRD?'New! →':it.id==='bird:'+FIRST_NEW_BIRD2?'Newest →':it.id==='bird:'+FIRST_EXTINCT?'Extinct 🦴 →':it.id==='bird:'+FIRST_MORE?'Even more birds →':'Your other birds & more →';sp.style.cssText='flex:0 0 auto;writing-mode:vertical-rl;transform:rotate(180deg);color:#9fb3cf;font-size:11px;font-weight:700;text-align:center;padding:0 2px';itemsEl.appendChild(sp)}
+    if(!sres&&tab==='birds'&&birdSepLabel(+it.id.slice(5))){const sp=document.createElement('div');sp.textContent=birdSepLabel(+it.id.slice(5));sp.style.cssText='flex:0 0 auto;writing-mode:vertical-rl;transform:rotate(180deg);color:#9fb3cf;font-size:11px;font-weight:700;text-align:center;padding:0 2px';itemsEl.appendChild(sp)}
     const btn=document.createElement('button');btn.className='it'+(mode.id===it.id?' on':'');
     if(it.icon){btn.appendChild(it.icon)}else{const s=document.createElement('span');s.className='ic';s.textContent=it.ic;btn.appendChild(s)}
     const l=document.createElement('span');l.textContent=it.n;btn.appendChild(l);
