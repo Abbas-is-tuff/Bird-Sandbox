@@ -1107,7 +1107,7 @@ function flyStep(b,dt,grounded){
 }
 function hurt(b,d,quiet){
   if(!b.alive){if(d>4)feathers(b,Math.min(5,d/8));return}
-  d*=.45*(b.def.mega?.15:b.def.strong?.35:1); // tougher birds (Abbas is extra tough 💪, Lemon is a tank 🛡️)
+  d*=.45*(b.def.mega?.45:b.def.strong?.65:1); // tougher birds (Abbas is extra tough 💪, Lemon is a tank 🛡️)
   b.lastHurtT=simTime;
   if(atk&&atk!==b&&isCreature(atk)){b.lastAtk=atk;b.lastAtkT=simTime}
   b.health-=d;if(d>.6&&b.health>0)emoHurt(b,d);b.hurtT=3;b.sleep=false;
@@ -4858,7 +4858,7 @@ function emotionUpdate(dt){
     if(b.peckT>0)b.peckT-=sec;
     if(b.inj)injuryHeal(b,sec);
     // everyone slowly heals once they've had a few seconds without getting hurt (holding a gun or not)
-    if(b.health<100&&!(b.fire>0)&&simTime-(b.lastHurtT??-99)>4){const rest=b.sleep||b.act==='sleep'||b.inHouse;b.health=Math.min(100,b.health+sec*(rest?4:1.6)*(b.wrathT>0?.5:1)*(b.def.mega?6:b.def.strong?2.5:1))}
+    if(b.health<100&&!(b.fire>0)&&simTime-(b.lastHurtT??-99)>4){const rest=b.sleep||b.act==='sleep'||b.inHouse;b.health=Math.min(100,b.health+sec*(rest?4:1.6)*(b.wrathT>0?.5:1)*(b.def.mega?2:b.def.strong?1.5:1))}
     // running away / charging: keep pushing every frame
     if(b.runT>0){b.runT-=sec;if(!busy(b)){const ps=b.type==='bird'?[b.U,b.L,b.H]:[b.C,b.Hp,b.Hd];if(b.type==='animal'&&b.act!=='walk'&&b.act!=='pounce'){b.act='walk';b.actT=.5}const top=b.type==='bird'?Math.max(2.6,(b.def.run||1)*2.4)*Math.max(.8,Math.min(1.6,b.s||1)):(b.def.spd||1.5)*Math.max(1,b.s||1)*1.7;
       const[vx]=vel(ps[0]);for(const p of ps)addVel(p,(b.runDir*top-vx)*.08*dt,0);b.f=b.runDir}}
@@ -4900,7 +4900,7 @@ function emotionUpdate(dt){
       if(b.emoT<=0)feel(b,EMO_ICON.angry);
       if(d>(b.wrathT>0||b.defend?60:45)*(b.s||1)+20)moveToward(b,q.x,q.y,true);
       else if(!(b.peckT>0)){b.peckT=b.wrathT>0||b.defend?.45:.8;b.f=q.x>me.x?1:-1;if(b.type==='bird'){b.act='peck';b.actT=.4}
-        const pw=(b.type==='animal'?Math.min(3,b.def.mass/3):1)*(b.wrathT>0?5:b.defend?3.5:1)*(b.def.mega?12:b.def.strong?4:1);
+        const pw=(b.type==='animal'?Math.min(3,b.def.mass/3):1)*(b.wrathT>0?5:b.defend?3.5:1)*(b.def.mega?3:b.def.strong?2:1);
         for(const p of foe.ps)addVel(p,b.f*2*pw,-1.5);
         atk=b;if(foe.type==='bird')hurt(foe,2*pw,true);else hurtAnimal(foe,2*pw);atk=null;
         fx.push({t:'star',x:q.x,y:q.y-10,vx:rand(-1,1),vy:-2,life:.6});if(okSnd('bonk',60))tone('square',300,180,.06,.05,null,q.x);
@@ -4978,7 +4978,7 @@ function injuryCheck(b,mx){
   const limbs=b.type==='bird'?['wing','leg1','leg2']:['legF','legB','tail'];
   for(const part of limbs){if(!b.att[part])continue;
     const v=mx?mx[part]||0:0;
-    if(!b.dragT&&v>(b.def.mega?36:b.def.strong?32:22)&&!(b.toughT>0)){const r=Math.random(),c=(v-22)/16;
+    if(!b.dragT&&v>(b.def.mega?28:b.def.strong?26:22)&&!(b.toughT>0)){const r=Math.random(),c=(v-22)/16;
       if(r<c*.35)injure(b,part,v>29&&part!=='tail'?'broken':Math.random()<.5?'torn':'disl')}
     const J=injJoint(b,part);if(!J)continue;const L0=(b.inj&&b.inj[part]?b.inj[part].len0:J.len),d=Math.hypot(J.a.x-J.b.x,J.a.y-J.b.y);
     if(d>L0*1.75&&Math.random()<.25)injure(b,part,'torn');
