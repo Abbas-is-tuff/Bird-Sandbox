@@ -2985,6 +2985,7 @@ function animalAI(b,dt){
       if(Math.random()<.5)fx.push({t:'heart',x:Hd.x,y:Hd.y-16,vy:-1,life:1});if(tg.dead)b.actT=0}}
   else if(a==='play'||a==='eat'||a==='chase'||a==='stalk')b.actT=0;
   if(tx!==null){const dx=tx-C.x;if(Math.abs(dx)>14)b.f=dx>0?1:-1;else if(a==='wander')b.actT=0}
+  if(b.runT>0&&legs>=2){run=Math.max(run,1);b.f=b.runDir}
   if(legs<2)run=0;
   if(d.hopper&&walk){if(Math.random()<(d.frog?.012:.03)*dt&&FF.touch)animalJump(b,b.f*d.spd*(run?2:1.3),d.jump*(run?.9:.7)*str)}
   else if(walk&&legs){
@@ -2992,7 +2993,7 @@ function animalAI(b,dt){
     if(terrainOn&&tH(C.x)>2){ // walking on a slope: push along the hill, and help a bit going uphill
       const dg=(gAt(C.x+6)-gAt(C.x-6))/12,l=Math.hypot(1,dg),tx=1/l,ty=dg/l;
       for(const p of [C,Hp,Hd,FF,BF]){const[vx,vy]=vel(p),along=vx*tx+vy*ty;addVel(p,(want-along)*.25*dt*tx,(want-along)*.25*dt*ty);if(want*dg<0)addVel(p,0,-G*.5*Math.min(1,Math.abs(ty))*dt)}
-    } else for(const p of [C,Hp,Hd]){const[vx]=vel(p);addVel(p,(want-vx)*.25*dt,0)}
+    } else {for(const p of [C,Hp,Hd]){const[vx]=vel(p);addVel(p,(want-vx)*.25*dt,0)}if(run)for(const p of [FF,BF]){const[vx]=vel(p);addVel(p,(want-vx)*.12*dt,0)}}
     if(Math.sin(b.ph)*Math.sin(b.ph-dt*.28)<0&&!d.mouse&&!d.turtle&&okSnd('pawstep',180))stepSound(C.x);
   }
   const st=walk&&!d.hopper?Math.sin(b.ph):0,lift=walk&&!d.hopper?Math.max(0,Math.cos(b.ph)):0;
@@ -4759,33 +4760,81 @@ function emoBoom(x,y,R){
 function moveToward(b,tx,ty,run){
   if(b.type==='bird'){const U=b.U,dx=tx-U.x;b.f=dx>0?1:-1;
     if(Math.abs(dx)>(run?220:110)&&b.att&&b.att.wing&&!b.def.flightless&&G>0&&b.flyT<=0)goalFly(b,tx,ty-20*b.s,'emo');
-    else{b.act='walk';b.actT=.6;if(run&&Math.random()<.04)hop(b,2,-5)}}
+    else{b.act='walk';b.actT=.6;if(run){b.runT=.35;b.runDir=b.f;if(Math.random()<.15)hop(b,2,-5)}}}
   else{b.f=tx>b.C.x?1:-1;if(!['pounce','stalk'].includes(b.act)){b.act='walk';b.actT=.8}
-    if(run){const[vx]=vel(b.C);const want=b.f*(b.def.spd||1.5)*(b.s||1)*1.6;for(const p of [b.C,b.Hp,b.Hd])addVel(p,(want-vx)*.12,0)}}
+    if(run){b.runT=.35;b.runDir=b.f}}
 }
 function busy(b){return !b.alive||b.dead||b.dragT||b.stun>0||b.frozenT>0||b.inHouse||b.inCar||b.held||(b.type==='bird'&&(b.sleep||b.act==='drink'||b.act==='bathe'))}
+/* ---- threat awareness: spot it, figure out what it is, run if it's dangerous ---- */
+let dangerList=[];
+function scanDangers(){
+  const L=[];
+  for(const o of bodies){if(o.dead)continue;
+    if(o.type==='bomb'&&o.fuse>0)L.push({o,x:o.ps[0].x,y:o.ps[0].y,R:230,sev:.9,what:'a bomb 💣'});
+    else if(o.type==='tnt'&&o.fuse)L.push({o,x:o.ps[0].x,y:o.ps[0].y,R:280,sev:1,what:'TNT 🧨'});
+    else if(o.type==='xpl'){const X=XPL[o.kind]||{};const p=o.ps[0];
+      if(o.kind==='nuke')L.push({o,x:p.x,y:p.y,R:X.R*1.05,sev:1.3,what:'a NUKE ☢️'});
+      else if(o.kind==='mine'){if(o.armed)L.push({o,x:p.x,y:p.y,R:70,sev:.8,what:'a land mine'})}
+      else if(o.lit||o.impact)L.push({o,x:p.x,y:p.y,R:(X.R||150)*1.25,sev:X.ice?.4:.9,what:'an explosive 💣'})}
+    else if(o.fire>0&&o.type!=='campfire'){const c=centroid(o);L.push({o,x:c.x,y:c.y,R:90,sev:.6,what:'fire 🔥'})}
+    else if(o.type==='animal'&&o.alive&&(o.def.hunter||o.def.dino)&&(o.act==='stalk'||o.act==='pounce')){L.push({o,x:o.C.x,y:o.C.y,R:220*Math.max(1,o.s),sev:.85,what:'a hunting '+o.def.n,pred:o})}
+    else if((o.type==='gun'&&o.holder&&(o.firing||o.cd>0))||(o.type==='sword'&&o.holder&&o.holder.foe)){const p=o.ps[o.ps.length-1];L.push({o,x:p.x,y:p.y,R:o.type==='gun'?260:120,sev:.7,what:'a '+(o.type==='gun'?'gun 🔫':'sword ⚔️'),owner:o.holder})}
+    else if(o.type==='car'&&o.motor){const F=carFrame(o),[vx]=vel(o.ps[0]);if(Math.abs(vx)>3)L.push({o,x:F.cx+vx*12,y:F.cy,R:130,sev:.6,what:'a speeding car 🚗',dir:Math.sign(vx)})}
+  }
+  for(const h of holes)L.push({x:h.x,y:h.y,R:340,sev:1,what:'a black hole 🕳️'});
+  for(const t of tornados)L.push({x:t.x,y:groundY-100,R:320,sev:.9,what:'a tornado 🌪️'});
+  for(const pd of ponds)if(pd.lava)L.push({x:pd.x+pd.w/2,y:groundY,R:pd.w/2+80,sev:.8,what:'lava 🌋'});
+  dangerList=L;
+}
+function dangerFor(b,me){
+  let best=null,bs=0;const s=b.s||1;
+  for(const d of dangerList){if(d.o===b||d.owner===b||(d.pred&&(d.pred===b)))continue;
+    if(d.pred){if(b.type==='animal'&&(b.def.mass>d.pred.def.mass*1.3||b.def.dino))continue; if(d.pred.target&&d.pred.target!==b&&b.type!=='bird')continue}
+    const dist=Math.hypot(d.x-me.x,d.y-me.y),reach=d.R+30*s;if(dist>reach*1.25)continue;
+    const score=d.sev*(1-dist/(reach*1.25));if(score>bs){bs=score;best=d}}
+  return best?{...best,score:bs}:null;
+}
+function nearDanger(x,y){for(const d of dangerList)if(Math.hypot(d.x-x,d.y-y)<d.R)return d;return null}
+function fleeFrom(b,me,d,e){
+  const away=me.x>=d.x?1:-1,far=d.R*1.4+60;
+  if(b.type==='bird'&&b.att&&b.att.wing&&!b.def.flightless&&G>0){if(b.flyT<=0||!b.goal||b.goal.kind!=='flee')goalFly(b,d.x+away*far,Math.min(me.y,d.y)-rand(120,260),'flee')}
+  else moveToward(b,d.x+away*far,me.y,true);
+  e.fear=Math.min(1,e.fear+.06);e.threat={x:d.x,y:d.y};
+}
 let emoClock=0;
 function emotionUpdate(dt){
-  const sec=dt/60;emoClock+=sec;const tick=emoClock>=.25;if(tick)emoClock=0;
+  const sec=dt/60;emoClock+=sec;const tick=emoClock>=.25;if(tick){emoClock=0;scanDangers()}
   for(const b of bodies){if(!isCreature(b))continue;const e=emo(b);if(b.emoT>0)b.emoT-=sec;if(!b.alive){continue}
     if(b.peckT>0)b.peckT-=sec;
+    // running away / charging: keep pushing every frame
+    if(b.runT>0){b.runT-=sec;if(!busy(b)){const ps=b.type==='bird'?[b.U,b.L,b.H]:[b.C,b.Hp,b.Hd];if(b.type==='animal'&&b.act!=='walk'&&b.act!=='pounce'){b.act='walk';b.actT=.5}const top=b.type==='bird'?Math.max(2.6,(b.def.run||1)*2.4)*Math.max(.8,Math.min(1.6,b.s||1)):(b.def.spd||1.5)*Math.max(1,b.s||1)*1.7;
+      const[vx]=vel(ps[0]);for(const p of ps)addVel(p,(b.runDir*top-vx)*.08*dt,0);b.f=b.runDir}}
     // feelings settle down over time
     const k=sec*.06;e.fear+=(0-e.fear)*k*2.2;e.anger+=(0-e.anger)*k*(1.5-b.tr.temper);e.sad+=(0-e.sad)*k*.7;e.love+=(0-e.love)*k;
     e.hap+=((.62+e.sat*.25-e.sad*.5-e.fear*.3)-e.hap)*k;e.conf+=(.5-e.conf)*k*.15;
     if(b.health>85&&e.fear<.2&&e.sad<.3)e.sat=Math.min(1,e.sat+sec*.012);
     if(b.health<40)e.sat=Math.max(0,e.sat-sec*.03);
+    if(tick&&b.type==='bird'&&b.sleep&&dangerFor(b,cPos(b))){b.sleep=false;feel(b,'❗',.6)}
     if(!tick||busy(b))continue;
     const me=cPos(b);
     // predators make prey nervous
     if(b.type==='bird'||(b.type==='animal'&&!b.def.hunter)){const hnt=bodies.find(o=>o.type==='animal'&&o.alive&&o.target===b&&(o.act==='stalk'||o.act==='pounce'));if(hnt){e.fear=Math.min(1,e.fear+.12*(1.1-b.tr.brave));e.threat={x:hnt.C.x,y:hnt.C.y}}}
-    // 1) panic: scared and not confident -> run away
+    // 0) is something dangerous nearby? look at it first, then decide
+    const dg=dangerFor(b,me);
+    if(dg){const known=b.seen===dg.o&&b.seen;
+      if(!b.spotT&&b.spotOf!==(dg.o||dg.what)){b.spotT=.5;b.spotOf=dg.o||dg.what;b.f=dg.x>me.x?1:-1;if(b.type==='bird'){b.goal=null;b.flyT=Math.min(b.flyT,0);b.act='idle';b.actT=.5}else{b.act='idle';b.actT=.5}feel(b,'❗',.6);continue}
+      if(b.spotT>0){b.spotT-=.25;b.f=dg.x>me.x?1:-1;if(b.spotT>0)continue;b.spotT=0}
+      // decide: brave & confident ones only run from the really dangerous stuff
+      const nerve=(b.tr.brave*.5+e.conf*.5)*(b.type==='animal'&&(b.def.hunter||b.def.dino)?1.3:1);
+      if(dg.score+dg.sev*.35>nerve*.75||dg.sev>=1){feel(b,dg.sev>=1?EMO_ICON.shock:EMO_ICON.scared,1);if(b.foe&&dg.owner!==b.foe)b.foe=b.foe;b.helping=null;fleeFrom(b,me,dg,e);continue}
+    } else {b.spotOf=null;b.spotT=0}
     if(e.fear>.55&&e.conf<.7&&e.threat){const away=me.x>e.threat.x?1:-1;
       if(b.type==='bird'&&b.att&&b.att.wing&&!b.def.flightless&&G>0){if(b.flyT<=0)goalFly(b,me.x+away*rand(250,450),me.y-rand(150,300),'emo')}
       else moveToward(b,me.x+away*300,me.y,true);
       if(b.emoT<=0)feel(b,EMO_ICON.scared);continue}
     // 2) conflict: angry and confident enough -> go after whoever hurt them
     const foe=b.foe;
-    if(foe&&(foe.dead||!foe.alive||simTime-b.foeT>14)){b.foe=null}
+    if(foe&&(foe.dead||!foe.alive||simTime-b.foeT>14||nearDanger(cPos(foe).x,cPos(foe).y))){b.foe=null}
     else if(foe&&e.anger>.45&&e.conf>.38){const q=cPos(foe),d=Math.hypot(q.x-me.x,q.y-me.y);
       if(b.emoT<=0)feel(b,EMO_ICON.angry);
       if(d>45*(b.s||1)+20)moveToward(b,q.x,q.y,true);
@@ -4799,7 +4848,7 @@ function emotionUpdate(dt){
       continue}
     // 3) empathy: go comfort a hurt friend
     const hp=b.helping;
-    if(hp){b.helpT-=.25;if(hp.dead||!hp.alive||b.helpT<=0||hp.health>=95){b.helping=null}
+    if(hp){b.helpT-=.25;if(hp.dead||!hp.alive||b.helpT<=0||hp.health>=95||nearDanger(cPos(hp).x,cPos(hp).y)){b.helping=null}
       else{const q=cPos(hp),d=Math.hypot(q.x-me.x,q.y-me.y);
         if(d>40*(b.s||1)+25)moveToward(b,q.x,q.y,false);
         else{if(b.type==='bird'){b.act='groom';b.friend=hp;b.actT=.5}
