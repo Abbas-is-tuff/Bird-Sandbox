@@ -1108,6 +1108,7 @@ function flyStep(b,dt,grounded){
 function hurt(b,d,quiet){
   if(!b.alive){if(d>4)feathers(b,Math.min(5,d/8));return}
   d*=.45; // tougher birds
+  b.lastHurtT=simTime;
   if(atk&&atk!==b&&isCreature(atk)){b.lastAtk=atk;b.lastAtkT=simTime}
   b.health-=d;if(d>.6&&b.health>0)emoHurt(b,d);b.hurtT=3;b.sleep=false;
   if(!quiet)feathers(b,Math.min(14,1+d/4));
@@ -2901,7 +2902,7 @@ function breakAnimalLimb(b,name){
   if(b.alive){hurtAnimal(b,22);if(b.alive)b.stun=Math.max(b.stun,1.5)}
 }
 function hurtAnimal(b,dmg){
-  if(!b.alive)return;dmg*=.45;if(atk&&atk!==b&&isCreature(atk)){b.lastAtk=atk;b.lastAtkT=simTime}b.health-=dmg;if(dmg>.6&&b.health>0)emoHurt(b,dmg);b.hurtT=2;
+  if(!b.alive)return;dmg*=.45;b.lastHurtT=simTime;if(atk&&atk!==b&&isCreature(atk)){b.lastAtk=atk;b.lastAtkT=simTime}b.health-=dmg;if(dmg>.6&&b.health>0)emoHurt(b,dmg);b.hurtT=2;
   for(let i=0;i<Math.min(8,1+dmg/5);i++)fx.push({t:'feather',x:b.C.x+rand(-8,8),y:b.C.y+rand(-8,8),vx:rand(-2,2),vy:rand(-3,0),rot:rand(0,TAU),vr:rand(-.2,.2),life:1,col:b.def.body,s:.6});
   if(dmg>8)b.stun=Math.max(b.stun,Math.min(2.5,dmg/15));
   if(b.def.turtle||b.def.curl)b.shell=4;
@@ -4855,6 +4856,8 @@ function emotionUpdate(dt){
   for(const b of bodies){if(!isCreature(b))continue;const e=emo(b);if(b.emoT>0)b.emoT-=sec;if(!b.alive){continue}
     if(b.peckT>0)b.peckT-=sec;
     if(b.inj)injuryHeal(b,sec);
+    // everyone slowly heals once they've had a few seconds without getting hurt (holding a gun or not)
+    if(b.health<100&&!(b.fire>0)&&simTime-(b.lastHurtT??-99)>4){const rest=b.sleep||b.act==='sleep'||b.inHouse;b.health=Math.min(100,b.health+sec*(rest?4:1.6)*(b.wrathT>0?.5:1))}
     // running away / charging: keep pushing every frame
     if(b.runT>0){b.runT-=sec;if(!busy(b)){const ps=b.type==='bird'?[b.U,b.L,b.H]:[b.C,b.Hp,b.Hd];if(b.type==='animal'&&b.act!=='walk'&&b.act!=='pounce'){b.act='walk';b.actT=.5}const top=b.type==='bird'?Math.max(2.6,(b.def.run||1)*2.4)*Math.max(.8,Math.min(1.6,b.s||1)):(b.def.spd||1.5)*Math.max(1,b.s||1)*1.7;
       const[vx]=vel(ps[0]);for(const p of ps)addVel(p,(b.runDir*top-vx)*.08*dt,0);b.f=b.runDir}}
