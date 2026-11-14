@@ -516,6 +516,8 @@ function buildPairs(){
       const a=map.get((cx+ox)*100000+cy+oy);if(!a)continue;
       for(const q of a){
         if(q.i<=p.i||q.body===p.body||(p.pinned&&q.pinned)||q.body.holder===p.body||p.body.holder===q.body||p.body.imp===q.body||q.body.imp===p.body)continue;
+        const pb=p.body.type==='branch',qb=q.body.type==='branch';
+        if(pb||qb){if(pb&&qb)continue;const br=pb?p:q,o=pb?q:p;if(o.body.type!=='bird'||o.py+o.r>br.y-br.r*.4+4)continue}
         const m=p.r+q.r+10,dx=q.x-p.x,dy=q.y-p.y;
         if(dx*dx+dy*dy<m*m)pairs.push(p,q);
       }
@@ -559,6 +561,8 @@ function statics(p){
     if(p.x+r<w.x||p.x-r>w.x+w.w||p.y+r<w.y||p.y-r>w.y+w.h)continue;
     if(w.ledge&&p.py+r>w.y+3)continue; // mountain ledges: only stand on them from above
     if((w.ptrunk||w.trunk)&&(p.body.type==='animal'||p.body.type==='car'))continue; // animals & cars walk past tree trunks
+    if(w.trunk||(w.bgTree&&!w.ptop))continue; // trees are in the background: everything passes through the trunk
+    if(w.bgTree&&w.ptop&&(p.body.type!=='bird'||p.py+r>w.y+3))continue; // palm top: only birds landing from above
     const cx=clamp(p.x,w.x,w.x+w.w),cy=clamp(p.y,w.y,w.y+w.h),dx=p.x-cx,dy=p.y-cy,d2=dx*dx+dy*dy;
     if(d2>=r*r)continue;
     if(d2>1e-6){const d=Math.sqrt(d2),nx=dx/d,ny=dy/d;p.x=cx+nx*r;p.y=cy+ny*r;contact(p,nx,ny,w)}
@@ -2314,8 +2318,8 @@ function makePlant(kind,x,base,o={}){
     case 'berrybush':pl.berries=4;break;
     case 'appletree':{const t=makeTree(x,base);t.apple=true;pl.tree=t;pl.apples=Array.from({length:6},(_,i)=>({u:rand(-.5,.5),v:rand(-.6,.3),ripe:rand(0,1)}));break}
     case 'palm':pl.h=clamp(base-120,120,230);pl.lean=Math.random()<.5?-1:1;pl.nuts=3;
-      wall({x:x-7,y:base-pl.h,w:14,h:pl.h,ptrunk:true});wall({x:x+pl.lean*18-18,y:base-pl.h-4,w:36,h:6,lampCap:true,ptop:true});break;
-    case 'pine':pl.h=clamp(base-90,130,260);wall({x:x-7,y:base-pl.h*.55,w:14,h:pl.h*.55,ptrunk:true});break;
+      wall({x:x-7,y:base-pl.h,w:14,h:pl.h,ptrunk:true,bgTree:true});wall({x:x+pl.lean*18-18,y:base-pl.h-4,w:36,h:6,lampCap:true,ptop:true,bgTree:true});break;
+    case 'pine':pl.h=clamp(base-90,130,260);wall({x:x-7,y:base-pl.h*.55,w:14,h:pl.h*.55,ptrunk:true,bgTree:true});break;
     case 'cactus':pl.h=rand(70,95);pl.arm=Math.random()<.5?-1:1;
       wall({x:x-10,y:base-pl.h,w:20,h:pl.h,cactus:true});wall({x:x+pl.arm*10+(pl.arm<0?-20:0),y:base-pl.h*.55,w:20,h:12,cactus:true});break;
     case 'mushroom':wall({x:x-7,y:base-38,w:14,h:38});wall({x:x-38,y:base-54,w:76,h:16,tramp:true,mush:true});break;
@@ -3950,10 +3954,10 @@ function gunSound(g,x){
 // first thing along a ray (bodies, walls, ground)
 function rayHit(x,y,ux,uy,R,skip){
   let best=R,hp=null;
-  for(const b of bodies){if(b.dead||skip.has(b)||b.type==='anchor')continue;
+  for(const b of bodies){if(b.dead||skip.has(b)||b.type==='anchor'||b.type==='branch')continue;
     for(const p of b.ps){if(p.noCol)continue;const dx=p.x-x,dy=p.y-y,t=dx*ux+dy*uy;if(t<0||t>best)continue;const perp=Math.abs(dx*uy-dy*ux);if(perp>p.r+1.5)continue;
       const tt=t-Math.sqrt(Math.max(0,(p.r+1.5)**2-perp*perp));if(tt<best){best=Math.max(0,tt);hp=p}}}
-  for(const w of walls){ // slab test
+  for(const w of walls){if(w.trunk||w.bgTree)continue; // slab test
     let t0=0,t1=best;for(const [o,u,lo,hi] of [[x,ux,w.x,w.x+w.w],[y,uy,w.y,w.y+w.h]]){if(Math.abs(u)<1e-9){if(o<lo||o>hi){t0=1;t1=0}continue}let a=(lo-o)/u,c=(hi-o)/u;if(a>c)[a,c]=[c,a];t0=Math.max(t0,a);t1=Math.min(t1,c)}
     if(t0<=t1&&t0<best&&t0>0){best=t0;hp=null}}
   if(uy>0){const tg=(groundY-y)/uy;if(tg>0&&tg<best&&!pondAt(x+ux*tg)){best=tg;hp=null}}
