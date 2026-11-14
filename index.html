@@ -4754,6 +4754,7 @@ function emoHurt(b,d){
   e.fear=Math.min(1,e.fear+d/35*(1.2-T.brave*.7));e.hap=Math.max(0,e.hap-d/80);e.sat=Math.max(0,e.sat-d/90);
   const a=isCreature(atk)&&atk!==b?atk:null;atk=null;
   if(a){b.lastAtk=a;b.lastAtkT=simTime}
+  if(a&&a.wrathT>0&&!(b.wrathT>0)&&b.health>20){standUp(b,a,true);rally(b,a)}
   if(a&&!(b.inCar&&a.inCar===b.inCar)){b.foe=a;b.foeT=simTime;e.anger=Math.min(1,e.anger+d/40*(.4+T.temper));e.threat={x:cPos(a).x,y:cPos(a).y}}
   else e.threat={x:cPos(b).x,y:cPos(b).y+30};
   feel(b,e.anger>e.fear&&e.conf>.45?EMO_ICON.angry:d>15?EMO_ICON.shock:EMO_ICON.scared);
@@ -4766,11 +4767,23 @@ function emoHurt(b,d){
     else oe.fear=Math.min(1,oe.fear+.05*(1-o.tr.brave))}
 }
 function isFriend(o,b){if(o.type!==b.type)return o.type==='bird'&&b.type==='bird';if(o.type==='bird')return true;return o.kind===b.kind||(o.def.dog&&b.def.dog)||(o.def.cat&&b.def.cat)}
+function standUp(o,villain,hurtNow){
+  if(!isCreature(o)||!o.alive||o===villain||o.wrathT>0)return;const e=emo(o);
+  const fresh=o.defend!==villain;o.defend=villain;o.defendT=22;o.foe=villain;o.foeT=simTime;e.anger=1;e.conf=Math.max(e.conf,.75);e.fear*=.3;o.helping=null;
+  if(fresh){feel(o,'😤',2);const q=cPos(o);fx.push({t:'text',x:q.x,y:q.y-36,vy:-.6,life:1.4,txt:'😤 '+cName(o)+(hurtNow?' fights back!':' joins the fight!')});if(o.type==='bird')birdCall(o)}}
+function rally(victim,villain){
+  const me=cPos(victim);
+  for(const o of bodies){if(o===victim||o===villain||!isCreature(o)||!o.alive||o.wrathT>0||o.defend===villain)continue;
+    if(villain.type==='bird'?o.type!=='bird':!isFriend(o,victim))continue;
+    const q=cPos(o);if(Math.hypot(q.x-me.x,q.y-me.y)>650)continue;
+    const fighters=bodies.filter(x=>x.defend===villain&&x.alive).length;
+    if(Math.random()<.45+o.tr.brave*.35+emo(o).conf*.2+fighters*.08)standUp(o,villain,false)}}
 function startWrath(k,victim){
   if(!isCreature(k)||!k.alive)return;const e=emo(k);const first=!(k.wrathT>0);
   k.wrathT=Math.max(k.wrathT||0,0)+(first?40:25);k.kills=(k.kills||0)+1;e.anger=1;e.conf=1;e.fear=0;e.sad=0;k.mourn=null;k.helping=null;k.foe=null;
   feel(k,'😈',3);const q=cPos(k);fx.push({t:'text',x:q.x,y:q.y-40,vy:-.6,life:1.8,txt:first?'😈 '+cName(k)+' is filled with WRATH!':'🔥 '+cName(k)+' — '+k.kills+' down!'});
-  tone('sawtooth',160,80,.5,.08,500,q.x);noise(.3,.15,600,'lowpass',q.x)}
+  tone('sawtooth',160,80,.5,.08,500,q.x);noise(.3,.15,600,'lowpass',q.x);
+  for(const o of bodies){if(o===k||o===victim||!isCreature(o)||!o.alive||o.type!==k.type&&k.type==='bird')continue;const p=cPos(o);if(Math.hypot(p.x-q.x,p.y-q.y)<700&&(o.tr.brave>.55||emo(o).conf>.65))standUp(o,k,false)}}
 function wrathTarget(b){const me=cPos(b);let best=null,bd=1100;
   for(const o of bodies){if(o===b||!isCreature(o)||!o.alive||o.inHouse)continue;if(b.type==='bird'?o.type!=='bird':(o.type==='animal'&&o.def.mass>b.def.mass*1.5))continue;
     const q=cPos(o),d=Math.hypot(q.x-me.x,q.y-me.y);if(d<bd){bd=d;best=o}}
@@ -4778,8 +4791,11 @@ function wrathTarget(b){const me=cPos(b);let best=null,bd=1100;
   return best}
 function emoDeath(b){
   const me=cPos(b),killer=b.lastAtk&&simTime-(b.lastAtkT||-99)<5&&isCreature(b.lastAtk)&&b.lastAtk.alive?b.lastAtk:null;
-  if(killer)startWrath(killer,b);
-  for(const o of bodies){if(o===b||!isCreature(o)||!o.alive||o===killer||o.wrathT>0)continue;const q=cPos(o),dd=Math.hypot(q.x-me.x,q.y-me.y);if(dd>500)continue;const oe=emo(o);
+  if(killer&&b.wrathT>0){const q=cPos(killer);fx.push({t:'text',x:q.x,y:q.y-40,vy:-.6,life:2,txt:'🏆 '+cName(killer)+' stopped '+cName(b)+'!'});
+    for(const o of bodies)if(isCreature(o)&&o.alive&&(o.defend===b||o===killer)){o.defend=null;o.foe=null;const oe=emo(o);oe.anger=0;oe.fear=0;oe.hap=Math.min(1,oe.hap+.4);oe.conf=Math.min(1,oe.conf+.2);feel(o,'🥳',3);if(o.type==='bird')birdCall(o)}
+    for(let i=0;i<5;i++)tone('triangle',700+i*150,900+i*150,.1,.04,null,q.x,i*.08)}
+  else if(killer&&!(killer.defend===b))startWrath(killer,b);
+  if(!(b.wrathT>0))for(const o of bodies){if(o===b||!isCreature(o)||!o.alive||o===killer||o.wrathT>0)continue;const q=cPos(o),dd=Math.hypot(q.x-me.x,q.y-me.y);if(dd>500)continue;const oe=emo(o);
     if(isFriend(o,b)){oe.sad=Math.min(1,oe.sad+.35+.5*o.tr.emp);oe.hap=Math.max(0,oe.hap-.35);feel(o,o.tr.emp>.5?EMO_ICON.grief:EMO_ICON.sad,3);o.mourn=b;o.mournT=6+o.tr.emp*6}
     else oe.fear=Math.min(1,oe.fear+.25);
     if(o===b.foe){oe.conf=Math.min(1,oe.conf+.15)}}
@@ -4790,7 +4806,7 @@ function emoBoom(x,y,R){
 }
 function moveToward(b,tx,ty,run){
   if(b.type==='bird'){const U=b.U,dx=tx-U.x;b.f=dx>0?1:-1;
-    if(Math.abs(dx)>(b.wrathT>0?70:run?220:110)&&b.att&&b.att.wing&&!b.def.flightless&&G>0&&b.flyT<=0)goalFly(b,tx,ty-20*b.s,'emo');
+    if(Math.abs(dx)>(b.wrathT>0||b.defend?70:run?220:110)&&b.att&&b.att.wing&&!b.def.flightless&&G>0&&b.flyT<=0)goalFly(b,tx,ty-20*b.s,'emo');
     else{b.act='walk';b.actT=.6;if(run){b.runT=.35;b.runDir=b.f;if(Math.random()<.15)hop(b,2,-5)}}}
   else{b.f=tx>b.C.x?1:-1;if(!['pounce','stalk'].includes(b.act)){b.act='walk';b.actT=.8}
     if(run){b.runT=.35;b.runDir=b.f}}
@@ -4826,7 +4842,7 @@ function dangerFor(b,me){
     const score=d.sev*(1-dist/(reach*1.25));if(score>bs){bs=score;best=d}}
   return best?{...best,score:bs}:null;
 }
-function nearDanger(x,y){for(const d of dangerList)if(Math.hypot(d.x-x,d.y-y)<d.R)return d;return null}
+function nearDanger(x,y,ign){for(const d of dangerList){if(ign&&(d.owner===ign||d.o===ign||d.owner===ign.foe))continue;if(Math.hypot(d.x-x,d.y-y)<d.R)return d}return null}
 function fleeFrom(b,me,d,e){
   const away=me.x>=d.x?1:-1,far=d.R*1.4+60;
   if(b.type==='bird'&&b.att&&b.att.wing&&!b.def.flightless&&G>0){if(b.flyT<=0||!b.goal||b.goal.kind!=='flee')goalFly(b,d.x+away*far,Math.min(me.y,d.y)-rand(120,260),'flee')}
@@ -4852,13 +4868,16 @@ function emotionUpdate(dt){
     const me=cPos(b);
     // predators make prey nervous
     if(b.type==='bird'||(b.type==='animal'&&!b.def.hunter)){const hnt=bodies.find(o=>o.type==='animal'&&o.alive&&o.target===b&&(o.act==='stalk'||o.act==='pounce'));if(hnt){e.fear=Math.min(1,e.fear+.12*(1.1-b.tr.brave));e.threat={x:hnt.C.x,y:hnt.C.y}}}
+    // standing up to a raging bird
+    if(b.defend){b.defendT-=.25;const v=b.defend;if(!v.alive||v.dead||!(v.wrathT>0)||b.defendT<=0||b.health<15){b.defend=null;if(b.foe===v)b.foe=null;if(b.health<15){e.fear=1;e.threat={x:cPos(v).x,y:cPos(v).y}}}
+      else{b.foe=v;b.foeT=simTime;e.anger=Math.max(e.anger,.9);e.conf=Math.max(e.conf,.6)}}
     // WRATH: hunt down the nearest bird and keep going
     if(b.wrathT>0){b.wrathT-=.25;e.anger=1;e.fear=0;e.sad=0;e.conf=Math.max(e.conf,.9);
       if(!b.foe||!b.foe.alive||b.foe.dead){b.foe=wrathTarget(b);b.foeT=simTime}else b.foeT=simTime;
       if(b.wrathT<=0){b.foe=null;e.anger=.3;feel(b,EMO_ICON.calm,2);const q=cPos(b);fx.push({t:'text',x:q.x,y:q.y-34,vy:-.6,life:1.4,txt:'😮‍💨 '+cName(b)+' calmed down'})}
       else if(b.emoT<=0)feel(b,Math.random()<.5?'😈':'😡',1.2)}
     // 0) is something dangerous nearby? look at it first, then decide
-    const dg=b.wrathT>0?null:dangerFor(b,me);
+    let dg=b.wrathT>0?null:dangerFor(b,me);if(dg&&b.defend&&dg.owner===b.defend)dg=null;
     if(dg){const known=b.seen===dg.o&&b.seen;
       if(!b.spotT&&b.spotOf!==(dg.o||dg.what)){b.spotT=.5;b.spotOf=dg.o||dg.what;b.f=dg.x>me.x?1:-1;if(b.type==='bird'){b.goal=null;b.flyT=Math.min(b.flyT,0);b.act='idle';b.actT=.5}else{b.act='idle';b.actT=.5}feel(b,'❗',.6);continue}
       if(b.spotT>0){b.spotT-=.25;b.f=dg.x>me.x?1:-1;if(b.spotT>0)continue;b.spotT=0}
@@ -4872,17 +4891,17 @@ function emotionUpdate(dt){
       if(b.emoT<=0)feel(b,EMO_ICON.scared);continue}
     // 2) conflict: angry and confident enough -> go after whoever hurt them
     const foe=b.foe;
-    if(foe&&(foe.dead||!foe.alive||simTime-b.foeT>14||nearDanger(cPos(foe).x,cPos(foe).y))){b.foe=null}
+    if(foe&&(foe.dead||!foe.alive||simTime-b.foeT>14||nearDanger(cPos(foe).x,cPos(foe).y,foe))){b.foe=null}
     else if(foe&&((e.anger>.45&&e.conf>.38)||b.wrathT>0)){const q=cPos(foe),d=Math.hypot(q.x-me.x,q.y-me.y);
       if(b.emoT<=0)feel(b,EMO_ICON.angry);
-      if(d>(b.wrathT>0?60:45)*(b.s||1)+20)moveToward(b,q.x,q.y,true);
-      else if(!(b.peckT>0)){b.peckT=b.wrathT>0?.45:.8;b.f=q.x>me.x?1:-1;if(b.type==='bird'){b.act='peck';b.actT=.4}
-        const pw=(b.type==='animal'?Math.min(3,b.def.mass/3):1)*(b.wrathT>0?5:1);
+      if(d>(b.wrathT>0||b.defend?60:45)*(b.s||1)+20)moveToward(b,q.x,q.y,true);
+      else if(!(b.peckT>0)){b.peckT=b.wrathT>0||b.defend?.45:.8;b.f=q.x>me.x?1:-1;if(b.type==='bird'){b.act='peck';b.actT=.4}
+        const pw=(b.type==='animal'?Math.min(3,b.def.mass/3):1)*(b.wrathT>0?5:b.defend?3.5:1);
         for(const p of foe.ps)addVel(p,b.f*2*pw,-1.5);
         atk=b;if(foe.type==='bird')hurt(foe,2*pw,true);else hurtAnimal(foe,2*pw);atk=null;
         fx.push({t:'star',x:q.x,y:q.y-10,vx:rand(-1,1),vy:-2,life:.6});if(okSnd('bonk',60))tone('square',300,180,.06,.05,null,q.x);
-        if(!(b.wrathT>0))e.anger-=.12;e.conf=Math.min(1,e.conf+.04);const fe=emo(foe);fe.fear=Math.min(1,fe.fear+.15*(1.1-foe.tr.brave));
-        if(e.anger<.3&&!(b.wrathT>0)){feel(b,EMO_ICON.proud,2);e.sat=Math.min(1,e.sat+.1);b.foe=null}}
+        if(!(b.wrathT>0)&&!b.defend)e.anger-=.12;e.conf=Math.min(1,e.conf+.04);const fe=emo(foe);fe.fear=Math.min(1,fe.fear+.15*(1.1-foe.tr.brave));
+        if(e.anger<.3&&!(b.wrathT>0)&&!b.defend){feel(b,EMO_ICON.proud,2);e.sat=Math.min(1,e.sat+.1);b.foe=null}}
       continue}
     // 3) empathy: go comfort a hurt friend
     const hp=b.helping;
@@ -4913,7 +4932,7 @@ function moodHTML(b){
   const e=emo(b),bar=(n,v,col)=>'<div style="display:flex;align-items:center;gap:6px;font-size:12px"><span style="width:86px">'+n+'</span><div style="flex:1;height:7px;background:#2a3446;border-radius:4px"><div style="width:'+Math.round(clamp(v,0,1)*100)+'%;height:100%;background:'+col+';border-radius:4px"></div></div></div>';
   const T=b.tr,trait=[T.emp>.65?'caring 💞':T.emp<.25?'cold 🧊':'',T.brave>.65?'brave 🦁':T.brave<.25?'timid 🐭':'',T.temper>.65?'hot-headed 🔥':T.temper<.2?'chill 😌':''].filter(Boolean).join(' · ')||'easy-going';
   return injHTML(b)+'<div style="margin-top:6px;color:#9fb3cf">Feelings</div>'+bar('😊 Happy',e.hap,'#ffd23f')+bar('😌 Satisfied',e.sat,'#8ac926')+bar('😎 Confident',e.conf,'#4cc9f0')+bar('😨 Scared',e.fear,'#b388ff')+bar('😠 Angry',e.anger,'#ff595e')+bar('😢 Sad',e.sad,'#5a8dee')+bar('🥰 Loved',e.love,'#ff7eb6')+
-    '<div style="font-size:12px;margin-top:3px">Personality: '+trait+'</div>'+(b.wrathT>0?'<div style="font-size:12px;color:#ff6b6b">😈 In a WRATH ('+(b.kills||0)+' kills) — hunting '+(b.foe&&b.foe.alive?cName(b.foe):'…')+'</div>':b.foe&&b.foe.alive?'<div style="font-size:12px">😠 Mad at '+cName(b.foe)+'</div>':'')+(b.helping?'<div style="font-size:12px">🤗 Helping '+cName(b.helping)+'</div>':'')+(b.mourn?'<div style="font-size:12px">💔 Missing '+cName(b.mourn)+'</div>':'');
+    '<div style="font-size:12px;margin-top:3px">Personality: '+trait+'</div>'+(b.defend&&b.defend.alive?'<div style="font-size:12px;color:#7fd8ff">😤 Fighting back against '+cName(b.defend)+'</div>':'')+(b.wrathT>0?'<div style="font-size:12px;color:#ff6b6b">😈 In a WRATH ('+(b.kills||0)+' kills) — hunting '+(b.foe&&b.foe.alive?cName(b.foe):'…')+'</div>':b.foe&&b.foe.alive?'<div style="font-size:12px">😠 Mad at '+cName(b.foe)+'</div>':'')+(b.helping?'<div style="font-size:12px">🤗 Helping '+cName(b.helping)+'</div>':'')+(b.mourn?'<div style="font-size:12px">💔 Missing '+cName(b.mourn)+'</div>':'');
 }
 
 /* =================== INJURIES: broken bones, torn ligaments, dislocated joints =================== */
