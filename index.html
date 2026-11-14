@@ -5022,21 +5022,30 @@ function updateAA(dt){
   for(const q of aaSites){q.cd-=sec;const tx=q.x,ty=q.base-34;
     let best=null,bd=1700;for(const o of bodies){if(!aaThreat(o))continue;const p=o.ps[0],d=Math.hypot(p.x-tx,p.y-ty);if(d<bd){bd=d;best=o}}
     q.tgt=best;
-    if(best){const p=best.ps[0],want=Math.atan2(p.y-ty,p.x-tx);let da=want-q.ang;while(da>Math.PI)da-=TAU;while(da<-Math.PI)da+=TAU;q.ang+=clamp(da,-.2*dt,.2*dt);
-      if(q.cd<=0&&Math.abs(da)<1.2){q.cd=.15;q.ammo^=1;best.aaLock=true;
+    if(best){const p=best.ps[0],want=Math.atan2(p.y-ty,p.x-tx);let da=want-q.ang;while(da>Math.PI)da-=TAU;while(da<-Math.PI)da+=TAU;q.ang+=clamp(da,-.09*dt,.09*dt);
+      q.lockT=Math.abs(da)<.35?(q.lockT||0)+sec:Math.max(0,(q.lockT||0)-sec*.5);
+      // needs a moment to lock on before it fires, then reloads between shots
+      if(q.cd<=0&&q.lockT>.25){q.cd=.3;q.lockT=.12;q.ammo^=1;best.aaLock=true;
+        if(Math.random()<.5)fx.push({t:'text',x:tx,y:ty-40,vy:-.6,life:1,txt:'🔒 Locked'});
         const side=q.ammo?-1:1,nx=-Math.sin(q.ang)*side*5,ny=Math.cos(q.ang)*side*5;
-        interceptors.push({x:tx+Math.cos(q.ang)*26+nx,y:ty+Math.sin(q.ang)*26+ny,vx:Math.cos(want)*24,vy:Math.sin(want)*24,t:best,life:5});
+        interceptors.push({x:tx+Math.cos(q.ang)*26+nx,y:ty+Math.sin(q.ang)*26+ny,vx:Math.cos(q.ang)*14,vy:Math.sin(q.ang)*14,t:best,life:6,age:0,miss:Math.random()<.25,err:rand(-1,1)});
         noise(.3,.25,1500,'bandpass',tx,2);tone('sawtooth',300,900,.25,.04,800,tx);
         for(let i=0;i<6;i++)fx.push({t:'smoke',x:tx,y:ty,vx:-Math.cos(q.ang)*rand(1,3)+rand(-1,1),vy:-Math.sin(q.ang)*rand(1,3),life:.7,s:rand(5,9)})}}
     else q.ang+=(-Math.PI/2-q.ang)*.02*dt}
-  for(const m of interceptors){m.life-=sec;const t=m.t;
-    if(t&&!t.dead){const p=t.ps[0],[tvx,tvy]=vel(p);const dd0=Math.hypot(p.x-m.x,p.y-m.y),lead=dd0>220?Math.min(5,dd0/60):0;const ax=p.x+tvx*lead-m.x,ay=p.y+tvy*lead-m.y,l=Math.hypot(ax,ay)||1;
-      const ms=Math.min(60,34+(5-m.life)*40);m.vx+=(ax/l*ms-m.vx)*.3*dt;m.vy+=(ay/l*ms-m.vy)*.3*dt;
+  for(const m of interceptors){m.life-=sec;m.age+=sec;const t=m.t;
+    if(t&&!t.dead){const p=t.ps[0],[tvx,tvy]=vel(p);const dd0=Math.hypot(p.x-m.x,p.y-m.y),lead=dd0>220?Math.min(4,dd0/80):0;
+      // some missiles aim a bit off and fly past (a near miss)
+      const off=m.miss&&dd0>60?m.err*Math.min(120,dd0*.5):0;
+      const ax=p.x+tvx*lead-m.x+off*.7,ay=p.y+tvy*lead-m.y-off*.7,l=Math.hypot(ax,ay)||1;
+      // slow launch, then the motor kicks in and it speeds up
+      const ms=m.age<.2?14:Math.min(55,14+(m.age-.2)*90),steer=m.age<.2?.04:.14;
+      m.vx+=(ax/l*ms-m.vx)*steer*dt;m.vy+=(ay/l*ms-m.vy)*steer*dt;
+      if(m.miss&&dd0<60&&!m.passed){m.passed=true;m.t=null;fx.push({t:'text',x:m.x,y:m.y-20,vy:-.6,life:1,txt:'💨 Missed!'})}
       // check along the whole path this step (so a fast missile can't skip past)
       const sx=m.vx*dt,sy=m.vy*dt,L2=sx*sx+sy*sy||1,tt=clamp(((p.x-m.x)*sx+(p.y-m.y)*sy)/L2,0,1),cx=m.x+sx*tt,cy=m.y+sy*tt;
-      if(Math.hypot(p.x-cx,p.y-cy)<p.r+26){m.x=cx;m.y=cy;aaBoom(m.x,m.y);t.dead=true;m.life=0;
+      if(!m.miss&&Math.hypot(p.x-cx,p.y-cy)<p.r+18){m.x=cx;m.y=cy;aaBoom(m.x,m.y);t.dead=true;m.life=0;
         fx.push({t:'text',x:m.x,y:m.y-24,vy:-.7,life:1.2,txt:'🎯 Intercepted!'});continue}}
-    else{m.vy+=.15*dt;if(!m.lost){m.lost=true;m.life=Math.min(m.life,1.2)}}
+    else{m.vy+=.08*dt;if(!m.lost){m.lost=true;m.life=Math.min(m.life,1.5)}}
     m.x+=m.vx*dt;m.y+=m.vy*dt;
     if(Math.random()<.7)fx.push({t:'smoke',x:m.x-m.vx*.6,y:m.y-m.vy*.6,vx:rand(-.4,.4),vy:rand(-.4,.4),life:.5,s:rand(3,6),col:'rgba(220,220,220,.6)'});
     if(m.y>(terrainOn?gAt(m.x):groundY)-3||m.life<=0){aaBoom(m.x,m.y);m.life=0}}
