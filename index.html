@@ -593,7 +593,7 @@ function step(dt,sub){
   for(const p of allP){
     if(p.pinned||p.body.held){p.px=p.x;p.py=p.y;p.touch=false;p.cn=null;continue}
     let vx=(p.x-p.px)*ratio*.9995,vy=(p.y-p.py)*ratio*.9995;
-    const lch=p.body.launchT>simTime,sp=Math.hypot(vx,vy),mx=(lch?150:60)*dt;if(sp>mx){vx*=mx/sp;vy*=mx/sp}
+    const lch=p.body.launchT>simTime,sp=Math.hypot(vx,vy),mx=(lch?100:60)*dt;if(sp>mx){vx*=mx/sp;vy*=mx/sp}
     let vxF=vx/dt,vyF=vy/dt;
     // water: buoyancy + drag
     const pd=pondAt(p.x);p.sub=0;
@@ -607,7 +607,7 @@ function step(dt,sub){
     }
     // air resistance + wind (quadratic drag on relative air velocity)
     const rx=windNow*(p.sub>0?.1:1)-vxF,ry=-vyF,rm=Math.hypot(rx,ry);
-    let c=airK*p.area*p.im*rm*dt*(lch?.15:1);if(c>.5)c=.5;
+    let c=airK*p.area*p.im*rm*dt*(lch?.45:1);if(c>.5)c=.5;
     vxF+=rx*c;vyF+=ry*c;
     vx=vxF*dt;vy=vyF*dt;
     p.vx0=vxF;p.vy0=vyF;p.px=p.x;p.py=p.y;
@@ -2132,7 +2132,7 @@ let slingSc=1;
 function makeSling(x,base=groundY){const sc=slingSc;const q={x:x,y:base-165*sc,base,sc};slings.push(q);return q}
 function launchFromSling(d){
   const q=d.sling,b=d.p.body,c=d.p,dx=q.x-c.x,dy=q.y-c.y,dd=Math.hypot(dx,dy);if(dd<18||b.dead)return;
-  const k=.55;for(const p of b.ps){if(p.pinned)continue;p.px=p.x-dx*k*DT;p.py=p.y-dy*k*DT;p.lvx=dx*k;p.lvy=dy*k}
+  const k=.36;for(const p of b.ps){if(p.pinned)continue;p.px=p.x-dx*k*DT;p.py=p.y-dy*k*DT;p.lvx=dx*k;p.lvy=dy*k}
   b.toughT=5;b.heldF=frameNo;b.launchT=simTime+2.5;fx.push({t:'ring',x:q.x,y:q.y,life:1});shake=Math.max(shake,dd/40);if(b.type==='bird'&&b.alive){b.stun=Math.max(b.stun,1.2);b.flyT=0;b.goal=null;b.sleep=false}
   tone('triangle',180,90,.25,.12,null,q.x);noise(.12,.25,1500,'bandpass',q.x,2);
 }
